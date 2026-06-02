@@ -50,20 +50,24 @@ The layout shows:
 
 Extract for the EXPANDED player (the one with the full scorecard grid visible - not just the name/score summary rows):
 - name: exact name as shown
-- stableford: the SECOND number after "/" in "Score XX/YY" → YY (this is the stableford total)
-- grossScore: the FIRST number before "/" in "Score XX/YY" → XX (this is total strokes)
-- birdies: count holes where Score row shows a score LESS than par for that hole (e.g. score 3 on par 4 = birdie). NOT net birdies - only gross birdies where actual strokes < par.
+- stableford: the SECOND number after "/" in "Score XX/YY" → YY
+- grossScore: the FIRST number before "/" in "Score XX/YY" → XX
+- birdies: count holes where Score < par for that hole (gross birdies only)
+- holeScores: array of stroke numbers from the Score row, left to right (e.g. [6,4,4,6,6,4,5,5,5])
+- holePars: array of par values from the Par row, left to right (e.g. [4,4,3,5,4,3,4,4,4])
 
 Also extract from the leaderboard rows above (players without expanded scorecard):
 - name: player name
 - stableford: number in the SCORE column (e.g. 20)
 - grossScore: 0 (not visible)
 - birdies: 0
+- holeScores: []
+- holePars: []
 
 holes: "For9" if hole numbers 1-9, "Bag9" if 10-18, "18" if full round
 
 Respond ONLY with valid JSON, no markdown, no backticks:
-{"course":"...","holes":"For9","players":[{"name":"...","stableford":16,"grossScore":45,"birdies":0}]}`
+{"course":"...","holes":"For9","players":[{"name":"...","stableford":16,"grossScore":45,"birdies":0,"holeScores":[6,4,4,6,6,4,5,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}`
               }
             ]
           }],

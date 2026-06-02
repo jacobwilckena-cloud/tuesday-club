@@ -2268,7 +2268,12 @@ function handleImageUpload(event) {
       var contentType = response.headers.get('content-type') || '';
       if (!response.ok || !contentType.includes('application/json')) {
         return response.text().then(function(text) {
-          throw new Error('OCR funktion fejlede (' + response.status + '). Tjek at GEMINI_API_KEY er sat i Netlify.');
+          try {
+            var err = JSON.parse(text);
+            throw new Error('OCR fejl: ' + (err.error || text));
+          } catch(e2) {
+            throw new Error('OCR fejl (' + response.status + '): ' + text.substring(0, 200));
+          }
         });
       }
       return response.json();

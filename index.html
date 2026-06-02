@@ -635,7 +635,7 @@ body {
   background: rgba(201,176,113,0.08);
   border: 1px solid rgba(201,176,113,0.2);
   color: #EFE7D2;
-  font-family: 'Crimson Text', serif;
+  font-family: \'Crimson Text\', serif;
   font-size: 28px;
   font-weight: 400;
   cursor: pointer;
@@ -702,7 +702,7 @@ body {
     
     <!-- HEADER -->
     <div style="text-align: center; margin-bottom: 60px;">
-      <h1 style="font-family: 'Crimson Text', serif; font-size: 48px; color: #C9B071; margin: 0; font-weight: 400;">Tuesday Club</h1>
+      <h1 style="font-family: \'Crimson Text\', serif; font-size: 48px; color: #C9B071; margin: 0; font-weight: 400;">Tuesday Club</h1>
       <p style="font-family: Inter, sans-serif; font-size: 14px; color: #B8AE95; margin: 8px 0 0 0; letter-spacing: 2px;">MØLLEÅENS GOLFKLUB</p>
     </div>
     
@@ -775,7 +775,7 @@ body {
     <!-- OCR UPLOAD SECTION -->
     <div id="ocrUploadSection" style="border: 1px dashed rgba(201,176,113,0.3); padding: 20px; margin-bottom: 24px; text-align: center; background: rgba(201,176,113,0.03);">
       <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 6px;">📸 SCAN SCORECARD</div>
-      <div style="font-family: 'Crimson Text', serif; font-style: italic; fontSize: 14px; color: #B8AE95; margin-bottom: 14px; line-height: 1.5;">
+      <div style="font-family: \'Crimson Text\', serif; font-style: italic; fontSize: 14px; color: #B8AE95; margin-bottom: 14px; line-height: 1.5;">
         Upload screenshots fra Golf GameBook<br/>
         Vi læser automatisk points, score og birdies
       </div>
@@ -786,7 +786,7 @@ body {
     </div>
     
     <div id="ocrLoadingSection" class="hidden" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; padding: 40px 24px; text-align: center; border: 1px solid rgba(201,176,113,0.2); background: rgba(26,23,19,0.98); border-radius: 8px; backdrop-filter: blur(10px);">
-      <div style="font-family: 'Crimson Text', serif; font-style: italic; font-size: 20px; color: #C9B071; margin-bottom: 16px;">
+      <div style="font-family: \'Crimson Text\', serif; font-style: italic; font-size: 20px; color: #C9B071; margin-bottom: 16px;">
         🔄 Læser scorecards…
       </div>
       <div style="font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95; letter-spacing: 1px;">
@@ -801,7 +801,7 @@ body {
     
     <div id="ocrReviewSection" class="hidden" style="border: 1px solid rgba(201,176,113,0.3); padding: 24px; margin-bottom: 24px; background: rgba(201,176,113,0.05);">
       <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 10px;">BEKRÆFT LÆSNING</div>
-      <div style="font-family: 'Crimson Text', serif; font-style: italic; font-size: 13px; color: #B8AE95; margin-bottom: 16px;" id="ocrReviewTitle"></div>
+      <div style="font-family: \'Crimson Text\', serif; font-style: italic; font-size: 13px; color: #B8AE95; margin-bottom: 16px;" id="ocrReviewTitle"></div>
       <div id="ocrReviewPlayers"></div>
       <div style="display: flex; gap: 12px; margin-top: 20px;">
         <button type="button" onclick="applyOcrToForm()" class="btn-primary" style="flex: 1;">Brug Data</button>
@@ -844,10 +844,11 @@ body {
         <label for="roundPlayer">Spiller</label>
         <select id="roundPlayer" required></select>
       </div>
+      <div id="singlePlayerFields">
       <div class="form-row">
         <div class="form-group">
           <label for="roundStableford">Stableford Points</label>
-          <input type="number" id="roundStableford" min="0" max="72" required>
+          <input type="number" id="roundStableford" min="0" max="72">
         </div>
         <div class="form-group">
           <label for="roundGross">Gross Score</label>
@@ -857,6 +858,7 @@ body {
       <div class="form-group">
         <label for="roundBirdies">Birdies</label>
         <input type="number" id="roundBirdies" min="0" max="18" value="0">
+      </div>
       </div>
       <div id="addRoundError" class="error-message hidden"></div>
       <div id="addRoundSuccess" class="success-message hidden"></div>
@@ -883,7 +885,7 @@ body {
       <div class="form-group">
         <label>Profil Billede</label>
         <div style="display: flex; align-items: center; gap: 16px;">
-          <div id="memberPhotoPreview" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(201,176,113,0.1); border: 2px solid rgba(201,176,113,0.3); display: flex; align-items: center; justify-content: center; font-family: 'Crimson Text', serif; font-size: 24px; color: #C9B071; overflow: hidden; flex-shrink: 0;">?</div>
+          <div id="memberPhotoPreview" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(201,176,113,0.1); border: 2px solid rgba(201,176,113,0.3); display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 24px; color: #C9B071; overflow: hidden; flex-shrink: 0;">?</div>
           <div>
             <input type="file" id="memberPhotoFile" accept="image/*" style="display:none" onchange="handlePhotoSelect(event, 'memberPhotoPreview', 'memberPhoto')">
             <button type="button" onclick="document.getElementById('memberPhotoFile').click()" class="btn-secondary" style="padding: 8px 16px; font-size: 12px;">📷 Upload billede</button>
@@ -1027,7 +1029,7 @@ body {
       <div class="form-group">
         <label>Profil Billede</label>
         <div style="display: flex; align-items: center; gap: 16px;">
-          <div id="editPhotoPreview" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(201,176,113,0.1); border: 2px solid rgba(201,176,113,0.3); display: flex; align-items: center; justify-content: center; font-family: 'Crimson Text', serif; font-size: 24px; color: #C9B071; overflow: hidden; flex-shrink: 0;">?</div>
+          <div id="editPhotoPreview" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(201,176,113,0.1); border: 2px solid rgba(201,176,113,0.3); display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 24px; color: #C9B071; overflow: hidden; flex-shrink: 0;">?</div>
           <div>
             <input type="file" id="editPlayerPhotoFile" accept="image/*" style="display:none" onchange="handlePhotoSelect(event, 'editPhotoPreview', 'editPlayerPhoto')">
             <button type="button" onclick="document.getElementById('editPlayerPhotoFile').click()" class="btn-secondary" style="padding: 8px 16px; font-size: 12px;">📷 Upload billede</button>
@@ -2472,11 +2474,21 @@ function renderMultiplayerForm() {
   var container = document.getElementById('multiplayerFormContainer');
   if (!container) return;
   
+  var singleFields = document.getElementById('singlePlayerFields');
+  var playerFieldGroup = document.getElementById('roundPlayer');
+  var playerGroup = playerFieldGroup ? playerFieldGroup.closest('.form-group') : null;
+
   if (!window.pendingMultiplayerRound || window.pendingMultiplayerRound.participants.length === 0) {
     container.innerHTML = '';
     container.classList.add('hidden');
+    if (singleFields) singleFields.style.display = '';
+    if (playerGroup) playerGroup.style.display = '';
     return;
   }
+  
+  // Hide single player fields — OCR data will be used directly
+  if (singleFields) singleFields.style.display = 'none';
+  if (playerGroup) playerGroup.style.display = 'none';
   
   container.classList.remove('hidden');
   var html = '<div style="border: 1px solid rgba(201,176,113,0.3); padding: 24px; background: rgba(201,176,113,0.05); margin-bottom: 24px;">';

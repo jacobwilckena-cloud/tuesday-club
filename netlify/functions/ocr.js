@@ -43,7 +43,7 @@ exports.handler = async (event) => {
 PRIORITY: If you see an expanded individual scorecard with "Score XX/YY" (e.g. "Score 45/16"), that player's data is:
 - grossScore = XX (the first number, total strokes)
 - stableford = YY (the second number, stableford points)
-- birdies = count of holes where Point row shows 3 or more
+- birdies = count of holes where the actual SCORE (strokes) is LESS than the hole's PAR. Only count gross birdies (e.g. score 3 on a par 4). Do NOT count net birdies from stableford points. If no score is under par, birdies = 0.
 
 For OTHER players only visible in the leaderboard:
 - stableford = the number shown in the SCORE column (e.g. 20)

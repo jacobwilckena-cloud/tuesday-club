@@ -1,4 +1,4 @@
-// Google Gemini API - Free tier (1500 requests/day)
+// OpenRouter API - Free tier with Gemini vision
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -11,30 +11,34 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'No images provided' }) };
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'GEMINI_API_KEY not configured' }) };
+      return { statusCode: 500, body: JSON.stringify({ error: 'OPENROUTER_API_KEY not configured' }) };
     }
 
     const results = [];
 
     for (const imageBase64 of images) {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  inline_data: {
-                    mime_type: 'image/jpeg',
-                    data: imageBase64
-                  }
-                },
-                {
-                  text: `Extract golf scorecard data from this Golf GameBook screenshot. Return ONLY valid JSON with this exact format, no other text, no markdown:
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://lucky-cobbler-e723bd.netlify.app',
+          'X-Title': 'Tuesday Club Golf App'
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.0-flash-exp:free',
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: { url: `data:image/jpeg;base64,${imageBase64}` }
+              },
+              {
+                type: 'text',
+                text: `Extract golf scorecard data from this Golf GameBook screenshot. Return ONLY valid JSON, no markdown, no backticks:
 {
   "players": [
     {
@@ -49,36 +53,37 @@ exports.handler = async (event) => {
 }
 
 Rules:
-- Extract ALL players visible on scorecard
-- stableford = total stableford points (the number after "/" in "Score XX/XX")
-- grossScore = total strokes
+- Extract ALL players visible
+- stableford = total stableford points (number after "/" in "Score XX/XX")
+- grossScore = total strokes (number before "/" in "Score XX/XX")
 - birdies = number of birdies (0 if not visible)
-- holes: use "18" for 18 holes, "For9" for front 9, "Bag9" for back 9
-- Return ONLY the JSON, nothing else, no backticks`
-                }
-              ]
-            }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 1000
-            }
-          })
-        }
-      );
+- holes: "18" for 18 holes, "For9" for front 9, "Bag9" for back 9
+- Return ONLY the JSON`
+              }
+            ]
+          }],
+          max_tokens: 1000,
+          temperature: 0.1
+        })
+      });
 
       if (!response.ok) {
         const err = await response.text();
-        throw new Error(`Gemini API error: ${response.status} ${err}`);
+        throw new Error(`OpenRouter error: ${response.status} ${err}`);
       }
 
       const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
+      const text = data.choices?.[0]?.message?.content || '';
+
       try {
-        const clean = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        const clean = text.trim()
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/```\s*$/i, '')
+          .trim();
         results.push(JSON.parse(clean));
       } catch (e) {
-        console.error('Failed to parse Gemini response:', text);
+        console.error('Failed to parse response:', text);
         throw new Error('Kunne ikke læse scorecard - prøv et tydeligere billede');
       }
     }

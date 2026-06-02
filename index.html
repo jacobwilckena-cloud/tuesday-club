@@ -2145,37 +2145,92 @@ function openPlayerProfile(playerId) {
   html += '<div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 14px;">Runder</div>';
 
   if (playerRounds.length === 0) {
-    html += '<div style="font-family: \'Crimson Text\', serif; font-style: italic; color: #B8AE95; font-size: 15px;">Ingen runder registreret endnu</div>';
+    html += '<div style=\"font-family: \'Crimson Text\', serif; font-style: italic; color: #B8AE95; font-size: 15px;\">Ingen runder registreret endnu</div>';
   } else {
-    for (var i = 0; i < Math.min(playerRounds.length, 15); i++) {
+    for (var i = 0; i < Math.min(playerRounds.length, 10); i++) {
       var r = playerRounds[i];
       var sc = r.scores[playerId];
       var dateStr = new Date(r.date).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' });
       var isBest = sc.stableford === statsAll.bestRound;
 
-      html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(201,176,113,0.08);">';
+      html += '<div style=\"padding: 16px 0; border-bottom: 1px solid rgba(201,176,113,0.08);\">';
+      
+      // Round header
+      html += '<div style=\"display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;\">';
       html += '<div>';
-      html += '<div style="font-family: Inter, sans-serif; font-size: 12px; color: #B8AE95;">' + dateStr + ' · ' + holesLabel(r.holes) + '</div>';
-      html += '<div style="font-family: \'Crimson Text\', serif; font-size: 14px; color: #EFE7D2; margin-top: 2px;">' + r.course + '</div>';
+      html += '<div style=\"font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95;\">' + dateStr + ' · ' + holesLabel(r.holes) + '</div>';
+      html += '<div style=\"font-family: \'Crimson Text\', serif; font-size: 14px; color: #EFE7D2;\">' + r.course + '</div>';
       html += '</div>';
-      html += '<div style="text-align: right; display: flex; align-items: center; gap: 16px;">';
-      if (sc.grossScore > 0) {
-        html += '<div style="font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95;">' + sc.grossScore + ' slag</div>';
-      }
-      if (sc.birdies > 0) {
-        html += '<div style="font-family: Inter, sans-serif; font-size: 11px; color: #C9B071;">🐦 ' + sc.birdies + '</div>';
-      }
-      html += '<div style="font-family: \'Crimson Text\', serif; font-size: 22px; color: ' + (isBest ? '#C9B071' : '#EFE7D2') + '; font-weight: 600;">' + sc.stableford + (isBest ? ' ★' : '') + '</div>';
+      html += '<div style=\"display: flex; align-items: center; gap: 12px;\">';
+      if (sc.grossScore > 0) html += '<div style=\"font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95;\">' + sc.grossScore + ' slag</div>';
+      if (sc.birdies > 0) html += '<div style=\"font-size: 11px; color: #C9B071;\">🐦 ' + sc.birdies + '</div>';
+      html += '<div style=\"font-family: \'Crimson Text\', serif; font-size: 24px; color: ' + (isBest ? '#C9B071' : '#EFE7D2') + '; font-weight: 600;\">' + sc.stableford + (isBest ? ' ★' : '') + '</div>';
       html += '</div>';
+      html += '</div>';
+
+      // Visual scorecard if holeScores available
+      if (sc.holeScores && sc.holeScores.length > 0 && sc.holePars && sc.holePars.length > 0) {
+        var numHoles = sc.holeScores.length;
+        var startHole = (r.holes === 'Bag9') ? 10 : 1;
+        
+        html += '<div style=\"overflow-x: auto; -webkit-overflow-scrolling: touch;\">';
+        html += '<table style=\"border-collapse: collapse; min-width: 100%; font-family: Inter, sans-serif; font-size: 11px;\">';
+        
+        // Hole numbers row
+        html += '<tr>';
+        html += '<td style=\"padding: 2px 4px; color: #B8AE95; font-size: 10px; white-space: nowrap;\">Hul</td>';
+        for (var h = 0; h < numHoles; h++) {
+          html += '<td style=\"padding: 2px 3px; text-align: center; color: #B8AE95;\">' + (startHole + h) + '</td>';
+        }
+        html += '<td style=\"padding: 2px 4px; text-align: center; color: #B8AE95; font-weight:600;\">Ud</td>';
+        html += '</tr>';
+        
+        // Par row
+        html += '<tr>';
+        html += '<td style=\"padding: 2px 4px; color: #B8AE95; font-size: 10px;\">Par</td>';
+        for (var h = 0; h < numHoles; h++) {
+          html += '<td style=\"padding: 2px 3px; text-align: center; color: #B8AE95;\">' + sc.holePars[h] + '</td>';
+        }
+        var parTotal = sc.holePars.reduce(function(a, b) { return a + b; }, 0);
+        html += '<td style=\"padding: 2px 4px; text-align: center; color: #B8AE95; font-weight:600;\">' + parTotal + '</td>';
+        html += '</tr>';
+        
+        // Score row with visual notation
+        html += '<tr>';
+        html += '<td style=\"padding: 3px 4px; color: #B8AE95; font-size: 10px;\">Score</td>';
+        for (var h = 0; h < numHoles; h++) {
+          var stroke = sc.holeScores[h];
+          var par = sc.holePars[h];
+          var diff = stroke - par;
+          var numStyle = 'display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:11px;font-weight:600;';
+          if (diff <= -2) {
+            numStyle += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
+          } else if (diff === -1) {
+            numStyle += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';
+          } else if (diff === 0) {
+            numStyle += 'color:#EFE7D2;';
+          } else if (diff === 1) {
+            numStyle += 'border:2px solid #B8AE95;color:#B8AE95;';
+          } else if (diff === 2) {
+            numStyle += 'border:2px solid #ef8c34;outline:2px solid #ef8c34;outline-offset:2px;color:#ef8c34;';
+          } else {
+            numStyle += 'background:rgba(239,68,68,0.2);border:2px solid #ef4444;color:#ef4444;';
+          }
+          html += '<td style=\"padding:2px;text-align:center;\"><span style=\"' + numStyle + '\">' + stroke + '</span></td>';
+        }
+        html += '<td style=\"padding:2px 4px;text-align:center;font-weight:600;color:#EFE7D2;\">' + sc.grossScore + '</td>';
+        html += '</tr>';
+        html += '</table>';
+        html += '</div>';
+      }
+      
       html += '</div>';
     }
-    if (playerRounds.length > 15) {
-      html += '<div style="font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95; text-align: center; margin-top: 12px;">+ ' + (playerRounds.length - 15) + ' ældre runder</div>';
+    if (playerRounds.length > 10) {
+      html += '<div style=\"font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95; text-align: center; margin-top: 12px;\">+ ' + (playerRounds.length - 10) + ' ældre runder</div>';
     }
   }
   html += '</div>';
-
-  document.getElementById('playerProfileContent').innerHTML = html;
   document.getElementById('playerProfileModal').classList.remove('hidden');
 }
 
@@ -2445,7 +2500,9 @@ function applyOcrToForm() {
       scores[playerId] = {
         stableford: ep.stableford || 0,
         grossScore: ep.grossScore || 0,
-        birdies: ep.birdies || 0
+        birdies: ep.birdies || 0,
+        holeScores: ep.holeScores || [],
+        holePars: ep.holePars || []
       };
     }
   });

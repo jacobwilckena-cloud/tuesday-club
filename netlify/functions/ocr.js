@@ -1,4 +1,5 @@
-// OpenRouter API - Free tier with Gemini vision
+// NVIDIA NIM - Free tier, 40 RPM, no daily limit
+// Model: meta/llama-3.2-90b-vision-instruct
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -11,24 +12,23 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'No images provided' }) };
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = process.env.NVIDIA_API_KEY;
     if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'OPENROUTER_API_KEY not configured' }) };
+      return { statusCode: 500, body: JSON.stringify({ error: 'NVIDIA_API_KEY not configured' }) };
     }
 
     const results = [];
 
     for (const imageBase64 of images) {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://lucky-cobbler-e723bd.netlify.app',
-          'X-Title': 'Tuesday Club Golf App'
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
-          model: 'qwen/qwen2.5-vl-72b-instruct:free',
+          model: 'meta/llama-3.2-90b-vision-instruct',
           messages: [{
             role: 'user',
             content: [
@@ -38,27 +38,18 @@ exports.handler = async (event) => {
               },
               {
                 type: 'text',
-                text: `Extract golf scorecard data from this Golf GameBook screenshot. Return ONLY valid JSON, no markdown, no backticks:
-{
-  "players": [
-    {
-      "name": "Player Name",
-      "stableford": 28,
-      "grossScore": 82,
-      "birdies": 1
-    }
-  ],
-  "course": "Course Name",
-  "holes": "18"
-}
+                text: `You are extracting golf scorecard data. Return ONLY a JSON object, no other text, no markdown, no backticks.
+
+Format:
+{"players":[{"name":"Player Name","stableford":28,"grossScore":82,"birdies":1}],"course":"Course Name","holes":"18"}
 
 Rules:
-- Extract ALL players visible
-- stableford = total stableford points (number after "/" in "Score XX/XX")
-- grossScore = total strokes (number before "/" in "Score XX/XX")
+- Extract ALL players from the scorecard
+- stableford = stableford points (the SECOND number in "Score 45/16" → 16)
+- grossScore = total strokes (the FIRST number in "Score 45/16" → 45)
 - birdies = number of birdies (0 if not visible)
-- holes: "18" for 18 holes, "For9" for front 9, "Bag9" for back 9
-- Return ONLY the JSON`
+- holes: "18" for 18 holes, "For9" for front 9 (hul 1-9), "Bag9" for back 9 (hul 10-18)
+- Return ONLY the JSON, nothing else`
               }
             ]
           }],
@@ -69,7 +60,7 @@ Rules:
 
       if (!response.ok) {
         const err = await response.text();
-        throw new Error(`OpenRouter error: ${response.status} ${err}`);
+        throw new Error(`NVIDIA API error: ${response.status} - ${err.substring(0, 200)}`);
       }
 
       const data = await response.json();
@@ -83,7 +74,7 @@ Rules:
           .trim();
         results.push(JSON.parse(clean));
       } catch (e) {
-        console.error('Failed to parse response:', text);
+        console.error('Parse error:', text);
         throw new Error('Kunne ikke læse scorecard - prøv et tydeligere billede');
       }
     }

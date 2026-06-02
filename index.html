@@ -2265,9 +2265,10 @@ function handleImageUpload(event) {
       body: JSON.stringify({ images: base64Images })
     })
     .then(function(response) {
-      if (!response.ok) {
-        return response.json().then(function(err) {
-          throw new Error(err.error || 'API fejl');
+      var contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
+        return response.text().then(function(text) {
+          throw new Error('OCR funktion fejlede (' + response.status + '). Tjek at ANTHROPIC_API_KEY er sat i Netlify.');
         });
       }
       return response.json();

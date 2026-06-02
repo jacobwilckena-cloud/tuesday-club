@@ -28,7 +28,7 @@ exports.handler = async (event) => {
           'X-Title': 'Tuesday Club Golf App'
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-exp:free',
+          model: 'meta-llama/llama-4-scout:free',
           messages: [{
             role: 'user',
             content: [

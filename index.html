@@ -842,7 +842,7 @@ body {
       </div>
       <div class="form-group">
         <label for="roundPlayer">Spiller</label>
-        <select id="roundPlayer" required></select>
+        <select id="roundPlayer"></select>
       </div>
       <div id="singlePlayerFields">
       <div class="form-row">
@@ -2559,11 +2559,50 @@ function renderMultiplayerForm() {
     var score = window.pendingMultiplayerRound.scores[pid];
     if (!player || !score) return;
     
-    html += '<div style="display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(201,176,113,0.2); align-items: center;">';
+    html += '<div style="padding: 12px 0; border-bottom: 1px solid rgba(201,176,113,0.2);">';
+    
+    // Player row with totals
+    html += '<div style="display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; align-items: center; margin-bottom: 8px;">';
     html += '<div style="font-family: \'Crimson Text\', serif; font-size: 17px; color: #EFE7D2;">' + player.name + '</div>';
     html += '<div style="text-align: center;"><div style="font-family: Inter, sans-serif; font-size: 9px; color: #B8AE95; margin-bottom: 2px;">POINTS</div><div style="font-family: \'Crimson Text\', serif; font-size: 20px; color: #C9B071; font-weight: 600;">' + score.stableford + '</div></div>';
     html += '<div style="text-align: center;"><div style="font-family: Inter, sans-serif; font-size: 9px; color: #B8AE95; margin-bottom: 2px;">GROSS</div><div style="font-family: \'Crimson Text\', serif; font-size: 20px; color: #EFE7D2;">' + (score.grossScore || '-') + '</div></div>';
     html += '<div style="text-align: center;"><div style="font-family: Inter, sans-serif; font-size: 9px; color: #B8AE95; margin-bottom: 2px;">BIRDIES</div><div style="font-family: \'Crimson Text\', serif; font-size: 20px; color: #EFE7D2;">' + (score.birdies || 0) + '</div></div>';
+    html += '</div>';
+    
+    // Visual scorecard preview if holeScores available
+    if (score.holeScores && score.holeScores.length > 0 && score.holePars && score.holePars.length > 0) {
+      html += '<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">';
+      html += '<table style="border-collapse: collapse; font-family: Inter, sans-serif; font-size: 11px; width: 100%;">';
+      
+      // Par row
+      html += '<tr>';
+      html += '<td style="padding: 2px 4px; color: #B8AE95; font-size: 10px; white-space: nowrap;">Par</td>';
+      for (var h = 0; h < score.holePars.length; h++) {
+        html += '<td style="padding: 2px 3px; text-align: center; color: #B8AE95;">' + score.holePars[h] + '</td>';
+      }
+      html += '</tr>';
+      
+      // Score row
+      html += '<tr>';
+      html += '<td style="padding: 3px 4px; color: #B8AE95; font-size: 10px;">Score</td>';
+      for (var h = 0; h < score.holeScores.length; h++) {
+        var s = score.holeScores[h];
+        var p = score.holePars[h];
+        var d = s - p;
+        var ns = 'display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:11px;font-weight:600;';
+        if (d <= -2)      ns += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
+        else if (d === -1) ns += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';
+        else if (d === 0)  ns += 'color:#EFE7D2;';
+        else if (d === 1)  ns += 'border:2px solid #B8AE95;color:#B8AE95;';
+        else if (d === 2)  ns += 'border:2px solid #ef8c34;outline:2px solid #ef8c34;outline-offset:2px;color:#ef8c34;';
+        else               ns += 'background:rgba(239,68,68,0.2);border:2px solid #ef4444;color:#ef4444;';
+        html += '<td style="padding:2px;text-align:center;"><span style="' + ns + '">' + s + '</span></td>';
+      }
+      html += '</tr>';
+      html += '</table>';
+      html += '</div>';
+    }
+    
     html += '</div>';
   });
   

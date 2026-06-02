@@ -2268,7 +2268,7 @@ function handleImageUpload(event) {
       var contentType = response.headers.get('content-type') || '';
       if (!response.ok || !contentType.includes('application/json')) {
         return response.text().then(function(text) {
-          throw new Error('OCR funktion fejlede (' + response.status + '). Tjek at ANTHROPIC_API_KEY er sat i Netlify.');
+          throw new Error('OCR funktion fejlede (' + response.status + '). Tjek at GEMINI_API_KEY er sat i Netlify.');
         });
       }
       return response.json();

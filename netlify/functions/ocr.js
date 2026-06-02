@@ -38,24 +38,32 @@ exports.handler = async (event) => {
               },
               {
                 type: 'text',
-                text: `You are reading a Golf GameBook screenshot. Extract golf scores and return ONLY a JSON object with no other text.
+                text: `This is a screenshot from the Golf GameBook app showing a Stableford scorecard.
 
-PRIORITY: If you see an expanded individual scorecard with "Score XX/YY" (e.g. "Score 45/16"), that player's data is:
-- grossScore = XX (the first number, total strokes)
-- stableford = YY (the second number, stableford points)
-- birdies = count of holes where the actual SCORE (strokes) is LESS than the hole's PAR. Only count gross birdies (e.g. score 3 on a par 4). Do NOT count net birdies from stableford points. If no score is under par, birdies = 0.
+The layout shows:
+- Player name and HCP (e.g. "Jacob Andersen HCP 14")
+- A hole grid with rows: Handicap / Par / Score / Point
+- Summary line: "Par XX  Score XX/XX  Position X"
+- The Score row shows strokes per hole (red circles = birdies, dark blue = bogey or worse)
+- The Point row shows stableford points per hole
+- "Ud" column = total for the 9 holes
 
-For OTHER players only visible in the leaderboard:
-- stableford = the number shown in the SCORE column (e.g. 20)
-- grossScore = 0 (not visible)
-- birdies = 0
+Extract for the EXPANDED player (the one with the full scorecard grid visible - not just the name/score summary rows):
+- name: exact name as shown
+- stableford: the SECOND number after "/" in "Score XX/YY" → YY (this is the stableford total)
+- grossScore: the FIRST number before "/" in "Score XX/YY" → XX (this is total strokes)
+- birdies: count holes where Score row shows a score LESS than par for that hole (e.g. score 3 on par 4 = birdie). NOT net birdies - only gross birdies where actual strokes < par.
 
-The "TIL PAR" column shows +/- vs par — do NOT use this as stableford.
+Also extract from the leaderboard rows above (players without expanded scorecard):
+- name: player name
+- stableford: number in the SCORE column (e.g. 20)
+- grossScore: 0 (not visible)
+- birdies: 0
 
-holes: use "18" for 18 holes, "For9" for front 9 (hul 1-9), "Bag9" for back 9 (hul 10-18). If you see hole numbers 1-9 only, it is "For9".
+holes: "For9" if hole numbers 1-9, "Bag9" if 10-18, "18" if full round
 
-Return ONLY this JSON format:
-{"players":[{"name":"Player Name","stableford":16,"grossScore":45,"birdies":1}],"course":"Course Name","holes":"For9"}`
+Respond ONLY with valid JSON, no markdown, no backticks:
+{"course":"...","holes":"For9","players":[{"name":"...","stableford":16,"grossScore":45,"birdies":0}]}`
               }
             ]
           }],

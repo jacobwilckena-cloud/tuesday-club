@@ -2157,7 +2157,7 @@ function renderAddRoundModal() {
       playersHTML += '<div>';
       playersHTML += '<div style="font-family: \'Crimson Text\', serif; font-size: 17px; color: #EFE7D2;">' + ep.name + '</div>';
       playersHTML += '<div style="font-family: Inter, sans-serif; font-size: 10px; color: #B8AE95; letter-spacing: 0.5px; margin-top: 2px;">';
-      playersHTML += ep.stableford + ' pts · ' + (ep.grossScore > 0 ? ep.grossScore + ' gr · ' : '') + (ep.birdies || 0) + ' birdies';
+      playersHTML += ep.stableford + ' pts · ' + (ep.grossScore > 0 ? ep.grossScore + ' slag · ' : '') + (ep.birdies || 0) + ' birdies';
       playersHTML += '</div>';
       playersHTML += '</div>';
       playersHTML += '<select onchange="ocrMatches[\'' + ep.name + '\'] = this.value ? parseInt(this.value) : undefined" style="background: #1F1C17; color: #EFE7D2; border: 1px solid rgba(201,176,113,0.3); padding: 10px; font-size: 14px; width: 100%;">';

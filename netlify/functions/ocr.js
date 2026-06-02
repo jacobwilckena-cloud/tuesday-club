@@ -38,18 +38,24 @@ exports.handler = async (event) => {
               },
               {
                 type: 'text',
-                text: `You are extracting golf scorecard data. Return ONLY a JSON object, no other text, no markdown, no backticks.
+                text: `You are reading a Golf GameBook screenshot. Extract golf scores and return ONLY a JSON object with no other text.
 
-Format:
-{"players":[{"name":"Player Name","stableford":28,"grossScore":82,"birdies":1}],"course":"Course Name","holes":"18"}
+PRIORITY: If you see an expanded individual scorecard with "Score XX/YY" (e.g. "Score 45/16"), that player's data is:
+- grossScore = XX (the first number, total strokes)
+- stableford = YY (the second number, stableford points)
+- birdies = count of holes where Point row shows 3 or more
 
-Rules:
-- Extract ALL players from the scorecard
-- stableford = stableford points (the SECOND number in "Score 45/16" → 16)
-- grossScore = total strokes (the FIRST number in "Score 45/16" → 45)
-- birdies = number of birdies (0 if not visible)
-- holes: "18" for 18 holes, "For9" for front 9 (hul 1-9), "Bag9" for back 9 (hul 10-18)
-- Return ONLY the JSON, nothing else`
+For OTHER players only visible in the leaderboard:
+- stableford = the number shown in the SCORE column (e.g. 20)
+- grossScore = 0 (not visible)
+- birdies = 0
+
+The "TIL PAR" column shows +/- vs par — do NOT use this as stableford.
+
+holes: use "18" for 18 holes, "For9" for front 9 (hul 1-9), "Bag9" for back 9 (hul 10-18). If you see hole numbers 1-9 only, it is "For9".
+
+Return ONLY this JSON format:
+{"players":[{"name":"Player Name","stableford":16,"grossScore":45,"birdies":1}],"course":"Course Name","holes":"For9"}`
               }
             ]
           }],

@@ -1,60 +1,40 @@
-// Uses native fetch (Node 18+ built-in - no dependencies needed)
+// Google Gemini API - Free tier (1500 requests/day)
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
   try {
     const { images } = JSON.parse(event.body);
-    
     if (!images || images.length === 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'No images provided' })
-      };
+      return { statusCode: 400, body: JSON.stringify({ error: 'No images provided' }) };
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'API key not configured' })
-      };
+      return { statusCode: 500, body: JSON.stringify({ error: 'GEMINI_API_KEY not configured' }) };
     }
 
-    // Process each image with Claude
     const results = [];
-    
+
     for (const imageBase64 of images) {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-opus-4-20250805',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: [
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
                 {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: 'image/jpeg',
+                  inline_data: {
+                    mime_type: 'image/jpeg',
                     data: imageBase64
                   }
                 },
                 {
-                  type: 'text',
-                  text: `Extract golf scorecard data from this Golf GameBook screenshot. Return ONLY valid JSON with this exact format, no other text:
+                  text: `Extract golf scorecard data from this Golf GameBook screenshot. Return ONLY valid JSON with this exact format, no other text, no markdown:
 {
   "players": [
     {
@@ -70,56 +50,55 @@ exports.handler = async (event) => {
 
 Rules:
 - Extract ALL players visible on scorecard
-- Stableford points must be a number
-- Gross score must be a number
-- Birdies must be a number (0 if not visible)
-- If data not found, use 0
-- Return ONLY the JSON, nothing else`
+- stableford = total stableford points (the number after "/" in "Score XX/XX")
+- grossScore = total strokes
+- birdies = number of birdies (0 if not visible)
+- holes: use "18" for 18 holes, "For9" for front 9, "Bag9" for back 9
+- Return ONLY the JSON, nothing else, no backticks`
                 }
               ]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 1000
             }
-          ]
-        })
-      });
+          })
+        }
+      );
 
       if (!response.ok) {
-        throw new Error(`Claude API error: ${response.statusText}`);
+        const err = await response.text();
+        throw new Error(`Gemini API error: ${response.status} ${err}`);
       }
 
       const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
-      if (data.content && data.content[0] && data.content[0].text) {
-        try {
-          var jsonStr = data.content[0].text.trim();
-          // Strip markdown code fences if present
-          jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-          const parsed = JSON.parse(jsonStr);
-          results.push(parsed);
-        } catch (e) {
-          console.error('Failed to parse Claude response:', data.content[0].text);
-          throw new Error('Invalid response from Claude');
-        }
+      try {
+        const clean = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        results.push(JSON.parse(clean));
+      } catch (e) {
+        console.error('Failed to parse Gemini response:', text);
+        throw new Error('Kunne ikke læse scorecard - prøv et tydeligere billede');
       }
     }
 
-    // Merge results from all images
-    const mergedPlayers = [];
+    // Merge players from all images
     const playerMap = {};
-    
+    const mergedPlayers = [];
     results.forEach(result => {
-      if (result.players) {
-        result.players.forEach(player => {
-          const key = player.name.toLowerCase();
-          if (!playerMap[key]) {
-            playerMap[key] = player;
-            mergedPlayers.push(player);
-          }
-        });
-      }
+      (result.players || []).forEach(player => {
+        const key = player.name.toLowerCase();
+        if (!playerMap[key]) {
+          playerMap[key] = player;
+          mergedPlayers.push(player);
+        }
+      });
     });
 
     return {
       statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         players: mergedPlayers,
         course: results[0]?.course || '',
@@ -129,9 +108,6 @@ Rules:
 
   } catch (error) {
     console.error('OCR Error:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message })
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };

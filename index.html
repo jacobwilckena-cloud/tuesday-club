@@ -967,6 +967,13 @@ body {
 </div>
 
 <!-- ADMIN PIN PROMPT -->
+<!-- PLAYER PROFILE MODAL -->
+<div id="playerProfileModal" class="modal-overlay hidden" onclick="if(event.target===this)closePlayerProfile()">
+  <div class="modal" style="max-width: 520px; max-height: 90vh; overflow-y: auto;">
+    <div id="playerProfileContent"></div>
+  </div>
+</div>
+
 <!-- CROP MODAL -->
 <div id="cropModal" class="modal-overlay hidden" style="z-index: 2000;">
   <div class="modal" style="max-width: 420px;">
@@ -1501,7 +1508,7 @@ function renderLeaderboard() {
         photoHtml = '<div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(201,176,113,0.1); margin-right: 12px; display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 16px; color: #C9B071; border: 2px solid rgba(201,176,113,0.3);">' + player.name.charAt(0) + '</div>';
       }
       
-      boardHtml += '<div class="standings-row ' + isTop3 + '">' +
+      boardHtml += '<div class="standings-row ' + isTop3 + '" onclick="openPlayerProfile(' + player.id + ')" style="cursor: pointer;">' +
         '<div class="rank">' + rank + '</div>' +
         '<div style="display: flex; align-items: center;">' +
         photoHtml +
@@ -2079,6 +2086,99 @@ function confirmCrop() {
 
 function closeCropModal() {
   document.getElementById('cropModal').classList.add('hidden');
+}
+
+// ========== PLAYER PROFILE ==========
+function openPlayerProfile(playerId) {
+  var player = players.find(function(p) { return p.id === playerId; });
+  if (!player) return;
+
+  var stats18 = getPlayerStats(playerId, '18h');
+  var stats9  = getPlayerStats(playerId, '9h');
+  var statsAll = getPlayerStats(playerId);
+
+  // Player rounds sorted newest first
+  var playerRounds = rounds.filter(function(r) {
+    return r.participants && r.participants.includes(playerId) && r.scores && r.scores[playerId];
+  }).sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+
+  var photoHtml = player.photo_url
+    ? '<img src="' + player.photo_url + '" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(201,176,113,0.4);">'
+    : '<div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(201,176,113,0.1); display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 32px; color: #C9B071; border: 3px solid rgba(201,176,113,0.3);">' + player.name.charAt(0) + '</div>';
+
+  var html = '';
+
+  // Header
+  html += '<div style="display: flex; align-items: center; gap: 20px; padding: 28px 28px 20px;">';
+  html += photoHtml;
+  html += '<div>';
+  html += '<h2 style="font-family: \'Crimson Text\', serif; font-size: 28px; color: #EFE7D2; margin: 0;">' + player.name + '</h2>';
+  html += '<div style="font-family: Inter, sans-serif; font-size: 12px; color: #B8AE95; margin-top: 4px;">' + player.club + '</div>';
+  html += '<div style="font-family: Inter, sans-serif; font-size: 12px; color: #C9B071; margin-top: 2px;">HCP ' + player.handicap.toFixed(1) + ' · Medlem siden ' + (player.joined || '—') + '</div>';
+  html += '</div>';
+  html += '<button onclick="closePlayerProfile()" style="margin-left: auto; background: none; border: none; color: #B8AE95; font-size: 24px; cursor: pointer; padding: 4px; line-height: 1;">×</button>';
+  html += '</div>';
+
+  // Stats grid
+  html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: rgba(201,176,113,0.1); margin: 0 28px 24px; border: 1px solid rgba(201,176,113,0.15);">';
+
+  function statBox(label, value, sub) {
+    return '<div style="background: #1a1713; padding: 16px 12px; text-align: center;">' +
+      '<div style="font-family: Inter, sans-serif; font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #B8AE95; margin-bottom: 6px;">' + label + '</div>' +
+      '<div style="font-family: \'Crimson Text\', serif; font-size: 26px; color: #C9B071; font-weight: 600;">' + value + '</div>' +
+      (sub ? '<div style="font-family: Inter, sans-serif; font-size: 10px; color: #B8AE95; margin-top: 2px;">' + sub + '</div>' : '') +
+      '</div>';
+  }
+
+  html += statBox('Runder', statsAll.rounds, '18h + 9h');
+  html += statBox('Snit (18h)', stats18.rounds > 0 ? stats18.qualifyingAvg : '—', stats18.rounds > 0 ? 'Best of ' + stats18.bestOfRating : 'ingen runder');
+  html += statBox('Snit (9h)', stats9.rounds > 0 ? stats9.qualifyingAvg : '—', stats9.rounds > 0 ? 'Best of ' + stats9.bestOfRating : 'ingen runder');
+  html += statBox('Birdies', statsAll.totalBirdies, statsAll.rounds > 0 ? (statsAll.totalBirdies / statsAll.rounds).toFixed(1) + ' per runde' : '');
+  html += statBox('Bedste runde', statsAll.bestRound || '—', '');
+  html += statBox('Wins', statsAll.wins, '');
+  html += '</div>';
+
+  // Round history
+  html += '<div style="padding: 0 28px 28px;">';
+  html += '<div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 14px;">Runder</div>';
+
+  if (playerRounds.length === 0) {
+    html += '<div style="font-family: \'Crimson Text\', serif; font-style: italic; color: #B8AE95; font-size: 15px;">Ingen runder registreret endnu</div>';
+  } else {
+    for (var i = 0; i < Math.min(playerRounds.length, 15); i++) {
+      var r = playerRounds[i];
+      var sc = r.scores[playerId];
+      var dateStr = new Date(r.date).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' });
+      var isBest = sc.stableford === statsAll.bestRound;
+
+      html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(201,176,113,0.08);">';
+      html += '<div>';
+      html += '<div style="font-family: Inter, sans-serif; font-size: 12px; color: #B8AE95;">' + dateStr + ' · ' + holesLabel(r.holes) + '</div>';
+      html += '<div style="font-family: \'Crimson Text\', serif; font-size: 14px; color: #EFE7D2; margin-top: 2px;">' + r.course + '</div>';
+      html += '</div>';
+      html += '<div style="text-align: right; display: flex; align-items: center; gap: 16px;">';
+      if (sc.grossScore > 0) {
+        html += '<div style="font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95;">' + sc.grossScore + ' slag</div>';
+      }
+      if (sc.birdies > 0) {
+        html += '<div style="font-family: Inter, sans-serif; font-size: 11px; color: #C9B071;">🐦 ' + sc.birdies + '</div>';
+      }
+      html += '<div style="font-family: \'Crimson Text\', serif; font-size: 22px; color: ' + (isBest ? '#C9B071' : '#EFE7D2') + '; font-weight: 600;">' + sc.stableford + (isBest ? ' ★' : '') + '</div>';
+      html += '</div>';
+      html += '</div>';
+    }
+    if (playerRounds.length > 15) {
+      html += '<div style="font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95; text-align: center; margin-top: 12px;">+ ' + (playerRounds.length - 15) + ' ældre runder</div>';
+    }
+  }
+  html += '</div>';
+
+  document.getElementById('playerProfileContent').innerHTML = html;
+  document.getElementById('playerProfileModal').classList.remove('hidden');
+}
+
+function closePlayerProfile() {
+  document.getElementById('playerProfileModal').classList.add('hidden');
 }
 
 function updateRoundDate() {

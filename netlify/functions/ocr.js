@@ -28,9 +28,10 @@ Extract:
 - holePars: array from the Par row e.g. [4,4,3,5,4,3,4,4,4]
 - holes: "For9" if holes 1-9, "Bag9" if 10-18, "18" if full round
 - course: course name
+- date: date from "Game MM/DD/YYYY" at top, convert to ISO format YYYY-MM-DD (e.g. "Game 4/21/2026" → "2026-04-21")
 
 Return ONLY valid JSON, no markdown:
-{"course":"...","holes":"For9","players":[{"name":"...","stableford":16,"grossScore":45,"birdies":0,"holeScores":[6,4,4,6,6,4,5,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}`;
+{"course":"...","holes":"For9","date":"2026-04-21","players":[{"name":"...","stableford":16,"grossScore":45,"birdies":0,"holeScores":[6,4,4,6,6,4,5,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}`;
 
     // Process all images IN PARALLEL for speed
     const promises = images.map(async (imageBase64) => {
@@ -88,7 +89,8 @@ Return ONLY valid JSON, no markdown:
       body: JSON.stringify({
         players: mergedPlayers,
         course: results[0]?.course || '',
-        holes: results[0]?.holes || 'For9'
+        holes: results[0]?.holes || 'For9',
+        date: results[0]?.date || ''
       })
     };
 

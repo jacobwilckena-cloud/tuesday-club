@@ -2448,29 +2448,20 @@ function handleImageUpload(event) {
   
   Promise.all(files.map(function(file) { return compressImage(file); }))
   .then(function(base64Images) {
-    // Call Netlify Function instead of Claude API directly
-    return fetch('/.netlify/functions/ocr', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ images: base64Images })
-    })
-    .then(function(response) {
-      var contentType = response.headers.get('content-type') || '';
-      if (!response.ok || !contentType.includes('application/json')) {
-        return response.text().then(function(text) {
-          try {
-            var err = JSON.parse(text);
-            throw new Error('OCR fejl: ' + (err.error || text));
-          } catch(e2) {
-            throw new Error('OCR fejl (' + response.status + '): ' + text.substring(0, 200));
-          }
+    // Call OCR function ONCE PER IMAGE in parallel (avoids 30s timeout)
+    return Promise.all(base64Images.map(function(img) {
+      return fetch('/.netlify/functions/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: img })
+      })
+      .then(function(response) {
+        return response.json().then(function(data) {
+          if (!response.ok) throw new Error('OCR fejl (' + response.status + '): ' + (data.error || JSON.stringify(data)));
+          return data;
         });
-      }
-      return response.json();
-    })
-    .then(function(result) {
-      return [result];
-    });
+      });
+    }));
   })
   .then(function(results) {
     var allPlayers = [];

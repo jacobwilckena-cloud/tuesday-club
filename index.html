@@ -1979,8 +1979,164 @@ function renderStatistics() {
   });
   html += '</div>';
 
+  // ===== 7. SPILLEROVERSIGT =====
+  html += '<div class="round-card" style="margin-bottom:24px;">';
+  html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:20px;">👤 Spilleroversigt</h3>';
+  
+  players.forEach(function(p) {
+    var stats = getPlayerStats(p.id);
+    var stats9 = getPlayerStats(p.id, '9h');
+    var stats18 = getPlayerStats(p.id, '18h');
+    if (stats.rounds === 0) return;
+    
+    var prounds = rounds.filter(function(r) {
+      return r.participants && r.participants.includes(p.id) && r.scores && r.scores[p.id];
+    }).sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+    
+    var recentScores = prounds.slice(0,5).map(function(r){ return r.scores[p.id].stableford; });
+    var trend = recentScores.length >= 2 ? recentScores[0] - recentScores[recentScores.length-1] : 0;
+    var trendTxt = trend > 2 ? '↑ I fremgang' : trend < -2 ? '↓ Nedgang' : '→ Stabil';
+    var trendCol = trend > 2 ? '#4ade80' : trend < -2 ? '#ef8c34' : '#B8AE95';
+
+    html += '<div style="border:1px solid rgba(201,176,113,0.12);padding:16px;margin-bottom:12px;">';
+    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">';
+    if (p.photo_url) {
+      html += '<img src="'+p.photo_url+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid rgba(201,176,113,0.3);">';
+    } else {
+      html += '<div style="width:48px;height:48px;border-radius:50%;background:rgba(201,176,113,0.1);display:flex;align-items:center;justify-content:center;font-family:\'Crimson Text\',serif;font-size:20px;color:#C9B071;border:2px solid rgba(201,176,113,0.2);">'+p.name.charAt(0)+'</div>';
+    }
+    html += '<div style="flex:1;">';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:18px;color:#EFE7D2;">'+p.name+'</div>';
+    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">HCP '+p.handicap.toFixed(1)+' · '+p.club+'</div>';
+    html += '</div>';
+    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:'+trendCol+';">'+trendTxt+'</div>';
+    html += '</div>';
+    
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-family:Inter,sans-serif;">';
+    function mini(label, val) {
+      return '<div style="text-align:center;background:rgba(201,176,113,0.04);padding:8px 4px;">' +
+        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#B8AE95;margin-bottom:4px;">'+label+'</div>' +
+        '<div style="font-family:\'Crimson Text\',serif;font-size:18px;color:#C9B071;font-weight:600;">'+val+'</div></div>';
+    }
+    html += mini('Runder', stats.rounds);
+    html += mini('Snit 9h', stats9.rounds > 0 ? stats9.qualifyingAvg : '—');
+    html += mini('Snit 18h', stats18.rounds > 0 ? stats18.qualifyingAvg : '—');
+    html += mini('Birdies', stats.totalBirdies);
+    html += mini('Bedste', stats.bestRound || '—');
+    html += mini('Wins', stats.wins);
+    html += '</div>';
+
+    html += '<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;">';
+    html += '<button onclick="generatePlayerSummary('+p.id+')" style="font-family:Inter,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px;padding:8px 14px;background:transparent;border:1px solid rgba(201,176,113,0.3);color:#C9B071;cursor:pointer;">✨ Generer sæsonanalyse</button>';
+    html += '<div id="ai-loading-'+p.id+'" style="display:none;font-size:11px;color:#B8AE95;">Genererer...</div>';
+    html += '</div>';
+    html += '<div id="ai-summary-'+p.id+'" style="margin-top:12px;font-family:\'Crimson Text\',serif;font-style:italic;font-size:15px;color:#EFE7D2;line-height:1.6;display:none;border-left:2px solid rgba(201,176,113,0.3);padding-left:12px;"></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // ===== 8. HANDICAP UDVIKLING GRAF =====
+  var playersWithHistory = players.filter(function(p) {
+    return p.handicap_history && p.handicap_history.length >= 1;
+  });
+  
+  // Also include current handicap as latest point for all active players
+  var graphPlayers = players.filter(function(p){ return getPlayerStats(p.id).rounds > 0; });
+  
+  if (graphPlayers.length > 0) {
+    html += '<div class="round-card">';
+    html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">📉 Handicap Udvikling</h3>';
+    html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Lavere er bedre</p>';
+    html += renderHandicapGraph(graphPlayers);
+    html += '</div>';
+  }
+
   html += '</div>';
   return html;
+}
+
+function renderHandicapGraph(graphPlayers) {
+  var W = 320, H = 160, PAD = { t:10, r:10, b:30, l:36 };
+  var innerW = W - PAD.l - PAD.r;
+  var innerH = H - PAD.t - PAD.b;
+
+  // Build data series per player
+  var series = graphPlayers.map(function(p) {
+    var pts = [];
+    if (p.handicap_history && p.handicap_history.length > 0) {
+      p.handicap_history.forEach(function(h) {
+        if (h.date && h.handicap != null) pts.push({ date: h.date, hcp: h.handicap });
+      });
+    }
+    // Always add current as latest point
+    var today = new Date().toISOString().split('T')[0];
+    if (!pts.length || pts[pts.length-1].hcp !== p.handicap) {
+      pts.push({ date: today, hcp: p.handicap });
+    }
+    pts.sort(function(a,b){ return a.date.localeCompare(b.date); });
+    return { name: p.name.split(' ')[0], color: p.id % 7 === 0 ? '#C9B071' : p.id % 7 === 1 ? '#4ade80' : p.id % 7 === 2 ? '#60a5fa' : p.id % 7 === 3 ? '#f472b6' : p.id % 7 === 4 ? '#fb923c' : p.id % 7 === 5 ? '#a78bfa' : '#34d399', pts: pts };
+  }).filter(function(s){ return s.pts.length > 0; });
+
+  if (!series.length) return '<div style="color:#B8AE95;font-style:italic;padding:16px;">Ingen data endnu — opdater handicap i admin for at se grafen.</div>';
+
+  // Get all dates and HCP values for scaling
+  var allDates = [], allHcp = [];
+  series.forEach(function(s){ s.pts.forEach(function(p){ allDates.push(p.date); allHcp.push(p.hcp); }); });
+  allDates.sort();
+  var minDate = allDates[0], maxDate = allDates[allDates.length-1];
+  var minHcp = Math.min.apply(null, allHcp) - 1;
+  var maxHcp = Math.max.apply(null, allHcp) + 1;
+
+  function xPos(date) {
+    if (minDate === maxDate) return PAD.l + innerW/2;
+    var t = (date.localeCompare(minDate)) / (maxDate.localeCompare(minDate));
+    return PAD.l + t * innerW;
+  }
+  function yPos(hcp) {
+    return PAD.t + (1 - (hcp - minHcp)/(maxHcp - minHcp)) * innerH;
+  }
+
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;overflow:visible;">';
+
+  // Grid lines
+  for (var i = 0; i <= 4; i++) {
+    var y = PAD.t + (i/4)*innerH;
+    var hcpVal = (maxHcp - (i/4)*(maxHcp-minHcp)).toFixed(1);
+    svg += '<line x1="'+PAD.l+'" y1="'+y+'" x2="'+(W-PAD.r)+'" y2="'+y+'" stroke="rgba(201,176,113,0.1)" stroke-width="1"/>';
+    svg += '<text x="'+(PAD.l-4)+'" y="'+(y+4)+'" font-family="Inter,sans-serif" font-size="8" fill="#B8AE95" text-anchor="end">'+hcpVal+'</text>';
+  }
+
+  // Lines and dots per player
+  series.forEach(function(s) {
+    if (s.pts.length === 1) {
+      // Single point — draw dot only
+      var cx = xPos(s.pts[0].date), cy = yPos(s.pts[0].hcp);
+      svg += '<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="'+s.color+'"/>';
+    } else {
+      var pathD = s.pts.map(function(p, i) {
+        return (i===0?'M':'L') + xPos(p.date).toFixed(1) + ' ' + yPos(p.hcp).toFixed(1);
+      }).join(' ');
+      svg += '<path d="'+pathD+'" fill="none" stroke="'+s.color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+      s.pts.forEach(function(p) {
+        svg += '<circle cx="'+xPos(p.date).toFixed(1)+'" cy="'+yPos(p.hcp).toFixed(1)+'" r="3" fill="'+s.color+'"/>';
+      });
+    }
+    // Label at last point
+    var last = s.pts[s.pts.length-1];
+    svg += '<text x="'+(xPos(last.date)+5)+'" y="'+(yPos(last.hcp)+4)+'" font-family="Inter,sans-serif" font-size="9" fill="'+s.color+'">'+s.name+'</text>';
+  });
+
+  svg += '</svg>';
+
+  // Legend
+  var legend = '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;">';
+  series.forEach(function(s) {
+    legend += '<div style="display:flex;align-items:center;gap:4px;font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;">';
+    legend += '<div style="width:12px;height:3px;background:'+s.color+';border-radius:2px;"></div>'+s.name+'</div>';
+  });
+  legend += '</div>';
+
+  return svg + legend;
 }
 
 function renderContent() {
@@ -3095,6 +3251,78 @@ function saveApprovedHandicap() {
       document.getElementById('handicapProposals').innerHTML +=
         '<div style="color:#ef4444;padding:8px;">Fejl: ' + err.message + '</div>';
     });
+}
+
+function generatePlayerSummary(playerId) {
+  var player = players.find(function(p){ return p.id === playerId; });
+  if (!player) return;
+
+  var loadingEl = document.getElementById('ai-loading-'+playerId);
+  var summaryEl = document.getElementById('ai-summary-'+playerId);
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (summaryEl) summaryEl.style.display = 'none';
+
+  // Build context about the player and their position relative to others
+  var stats = getPlayerStats(playerId);
+  var stats9 = getPlayerStats(playerId, '9h');
+  var stats18 = getPlayerStats(playerId, '18h');
+
+  // Leaderboard position 9h
+  var lb9 = getLeaderboardData().leaderboard9h;
+  var lb18 = getLeaderboardData().leaderboard18h;
+  var pos9 = lb9.findIndex(function(p){ return p.id === playerId; }) + 1;
+  var pos18 = lb18.findIndex(function(p){ return p.id === playerId; }) + 1;
+
+  // Recent rounds
+  var prounds = rounds.filter(function(r) {
+    return r.participants && r.participants.includes(playerId) && r.scores && r.scores[playerId];
+  }).sort(function(a,b){ return new Date(b.date)-new Date(a.date); }).slice(0,5);
+
+  var recentStr = prounds.map(function(r) {
+    var sc = r.scores[playerId];
+    return r.date + ' ('+holesLabel(r.holes)+'): '+sc.stableford+' pts'+(sc.grossScore>0?', '+sc.grossScore+' slag':'');
+  }).join('; ');
+
+  // Other players context
+  var othersStr = players.filter(function(p){ return p.id !== playerId && getPlayerStats(p.id).rounds > 0; })
+    .map(function(p) {
+      var ps = getPlayerStats(p.id);
+      var lbPos9 = lb9.findIndex(function(x){ return x.id === p.id; }) + 1;
+      return p.name + ' (HCP '+p.handicap.toFixed(1)+', snit '+ps.qualifyingAvg+', #'+lbPos9+' på 9h leaderboard)';
+    }).join('; ');
+
+  var context = 'Spiller: '+player.name+'\n'+
+    'HCP: '+player.handicap.toFixed(1)+'\n'+
+    'Runder: '+stats.rounds+'\n'+
+    (pos9>0?'Leaderboard position 9h: #'+pos9+'\n':'')+
+    (pos18>0?'Leaderboard position 18h: #'+pos18+'\n':'')+
+    'Bedste snit 9h: '+(stats9.qualifyingAvg||'—')+'\n'+
+    'Bedste snit 18h: '+(stats18.qualifyingAvg||'—')+'\n'+
+    'Birdies: '+stats.totalBirdies+'\n'+
+    'Bedste runde: '+(stats.bestRound||'—')+'\n'+
+    'Seneste runder: '+recentStr+'\n'+
+    'Andre spillere: '+othersStr;
+
+  fetch('/.netlify/functions/ocr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'summary', context: context, playerName: player.name })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (summaryEl) {
+      summaryEl.textContent = data.summary || 'Ingen analyse tilgængelig.';
+      summaryEl.style.display = 'block';
+    }
+  })
+  .catch(function(err) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (summaryEl) {
+      summaryEl.textContent = 'Fejl: ' + err.message;
+      summaryEl.style.display = 'block';
+    }
+  });
 }
 
 function exportData() {

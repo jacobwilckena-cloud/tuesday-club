@@ -591,8 +591,8 @@ body {
 
 .logout-btn {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 16px;
+  right: 16px;
   padding: 10px 20px;
   background: rgba(201,176,113,0.1);
   border: 1px solid rgba(201,176,113,0.3);
@@ -604,23 +604,23 @@ body {
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s;
-  z-index: 100;
+  z-index: 9999;
 }
 
 .logout-btn:hover { background: rgba(201,176,113,0.2); }
 
 .admin-btn {
   position: fixed;
-  top: 20px;
-  right: 100px;
+  top: 16px;
+  right: 110px;
   padding: 10px 16px;
-  background: transparent;
+  background: rgba(18,24,21,0.9);
   border: none;
   color: #C9B071;
   font-size: 20px;
   cursor: pointer;
   transition: all 0.2s;
-  z-index: 100;
+  z-index: 9999;
 }
 
 .admin-btn:hover { 
@@ -659,13 +659,19 @@ body {
 }
 
 .pin-dot {
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(201,176,113,0.4);
+  background: transparent;
+  transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .pin-dot.filled {
   background: #C9B071;
   border-color: #C9B071;
-  box-shadow: 0 0 8px rgba(201,176,113,0.4);
+  box-shadow: 0 0 10px rgba(201,176,113,0.6);
+  transform: scale(1.2);
 }
 
 /* ========== RESPONSIVE ========== */
@@ -712,10 +718,10 @@ body {
       
       <!-- PIN DISPLAY DOTS -->
       <div id="pinDisplay" style="display: flex; gap: 16px; justify-content: center; margin-bottom: 48px;">
-        <div class="pin-dot" style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(201,176,113,0.3); background: transparent;"></div>
-        <div class="pin-dot" style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(201,176,113,0.3); background: transparent;"></div>
-        <div class="pin-dot" style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(201,176,113,0.3); background: transparent;"></div>
-        <div class="pin-dot" style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(201,176,113,0.3); background: transparent;"></div>
+        <div class="pin-dot"></div>
+        <div class="pin-dot"></div>
+        <div class="pin-dot"></div>
+        <div class="pin-dot"></div>
       </div>
       
       <!-- NUMBER PAD -->

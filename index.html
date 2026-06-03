@@ -701,6 +701,8 @@ body {
 </style>
 </head>
 <body>
+<button onclick="handleLogout()" class="logout-btn" id="logoutBtn" style="display:none">Log ud</button>
+<button onclick="openAdminPanel()" class="admin-btn" id="adminBtn" title="Admin" style="display:none">⚙️</button>
 
 <!-- LOGIN SCREEN - PIN ENTRY -->
 <div id="loginScreen" class="login-screen">
@@ -748,8 +750,6 @@ body {
 
 <!-- MAIN APP -->
 <div id="mainApp" class="hidden">
-  <button onclick="handleLogout()" class="logout-btn">Log ud</button>
-  <button onclick="openAdminPanel()" class="admin-btn" title="Admin">⚙️</button>
   
   <header class="app-header">
     <h1 class="app-title">Tuesday Club</h1>
@@ -1931,6 +1931,8 @@ function checkPin() {
     console.log('✅ PIN Login SUCCESS');
     isLoggedIn = true;
     localStorage.setItem('tuesdayLogin', 'true');
+    document.getElementById('logoutBtn').style.display = '';
+    document.getElementById('adminBtn').style.display = '';
     
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
@@ -2263,6 +2265,8 @@ function updateRoundDate() {
 function handleLogout() {
   isLoggedIn = false;
   localStorage.removeItem('tuesdayLogin');
+  document.getElementById('logoutBtn').style.display = 'none';
+  document.getElementById('adminBtn').style.display = 'none';
   document.getElementById('mainApp').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
 }
@@ -3276,6 +3280,8 @@ function init() {
   
   // Auto-login if previously logged in
   if (isLoggedIn) {
+    document.getElementById('logoutBtn').style.display = '';
+    document.getElementById('adminBtn').style.display = '';
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
     loadSupabase().then(loadPlayers).then(loadRounds).then(function() {

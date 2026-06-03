@@ -933,6 +933,7 @@ body {
     <div style="border-bottom: 1px solid rgba(201,176,113,0.12); margin-bottom: 24px;">
       <button id="adminTabPlayers" onclick="switchAdminTab('players')" class="btn-secondary" style="border: none; border-bottom: 2px solid #C9B071; border-radius: 0; margin-right: 8px;">Spillere</button>
       <button id="adminTabRounds" onclick="switchAdminTab('rounds')" class="btn-secondary" style="border: none; border-bottom: 2px solid transparent; border-radius: 0; margin-right: 8px;">Runder</button>
+      <button id="adminTabHandicap" onclick="switchAdminTab('handicap')" class="btn-secondary" style="border: none; border-bottom: 2px solid transparent; border-radius: 0; margin-right: 8px;">Handicap</button>
       <button id="adminTabData" onclick="switchAdminTab('data')" class="btn-secondary" style="border: none; border-bottom: 2px solid transparent; border-radius: 0;">Data</button>
     </div>
     
@@ -942,6 +943,20 @@ body {
     
     <div id="adminRoundsContent" class="hidden">
       <div id="adminRoundsList"></div>
+    </div>
+    
+    <div id="adminHandicapContent" class="hidden">
+      <div style="margin-bottom: 24px;">
+        <h3 style="font-size: 20px; color: #EFE7D2; margin-bottom: 8px;">📊 Opdater Handicap</h3>
+        <p style="color: #B8AE95; font-size: 14px; margin-bottom: 16px;">Upload screenshot fra GolfBox/DGU handicapliste. Appen finder automatisk dine spillere og foreslår opdateringer.</p>
+        <input type="file" id="handicapUploadInput" accept="image/*" multiple style="display:none" onchange="handleHandicapUpload(event)">
+        <button onclick="document.getElementById('handicapUploadInput').click()" class="btn-primary">📷 Upload GolfBox screenshot</button>
+      </div>
+      <div id="handicapLoadingSection" class="hidden" style="text-align:center; padding: 24px; color: #B8AE95;">
+        <div style="font-size: 24px; margin-bottom: 8px;">⏳</div>
+        <div>Læser handicapliste...</div>
+      </div>
+      <div id="handicapProposals"></div>
     </div>
     
     <div id="adminDataContent" class="hidden">
@@ -2736,9 +2751,11 @@ function showAdminPanel() {
   currentAdminTab = 'players';
   document.getElementById('adminTabPlayers').style.borderBottomColor = '#C9B071';
   document.getElementById('adminTabRounds').style.borderBottomColor = 'transparent';
+  document.getElementById('adminTabHandicap').style.borderBottomColor = 'transparent';
   document.getElementById('adminTabData').style.borderBottomColor = 'transparent';
   document.getElementById('adminPlayersContent').classList.remove('hidden');
   document.getElementById('adminRoundsContent').classList.add('hidden');
+  document.getElementById('adminHandicapContent').classList.add('hidden');
   document.getElementById('adminDataContent').classList.add('hidden');
   document.getElementById('adminModal').classList.remove('hidden');
 }
@@ -2753,9 +2770,11 @@ function switchAdminTab(tab) {
   // Reset all tabs
   document.getElementById('adminTabPlayers').style.borderBottomColor = 'transparent';
   document.getElementById('adminTabRounds').style.borderBottomColor = 'transparent';
+  document.getElementById('adminTabHandicap').style.borderBottomColor = 'transparent';
   document.getElementById('adminTabData').style.borderBottomColor = 'transparent';
   document.getElementById('adminPlayersContent').classList.add('hidden');
   document.getElementById('adminRoundsContent').classList.add('hidden');
+  document.getElementById('adminHandicapContent').classList.add('hidden');
   document.getElementById('adminDataContent').classList.add('hidden');
   
   // Show selected tab
@@ -2765,10 +2784,199 @@ function switchAdminTab(tab) {
   } else if (tab === 'rounds') {
     document.getElementById('adminTabRounds').style.borderBottomColor = '#C9B071';
     document.getElementById('adminRoundsContent').classList.remove('hidden');
+  } else if (tab === 'handicap') {
+    document.getElementById('adminTabHandicap').style.borderBottomColor = '#C9B071';
+    document.getElementById('adminHandicapContent').classList.remove('hidden');
   } else if (tab === 'data') {
     document.getElementById('adminTabData').style.borderBottomColor = '#C9B071';
     document.getElementById('adminDataContent').classList.remove('hidden');
   }
+}
+
+// ========== HANDICAP UPDATE ==========
+var handicapProposals = [];
+
+function handleHandicapUpload(event) {
+  var files = Array.from(event.target.files || []);
+  if (!files.length) return;
+
+  document.getElementById('handicapLoadingSection').classList.remove('hidden');
+  document.getElementById('handicapProposals').innerHTML = '';
+  event.target.value = '';
+
+  Promise.all(files.map(function(file) { return compressImage(file); }))
+    .then(function(images) {
+      return Promise.all(images.map(function(img) {
+        return fetch('/.netlify/functions/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: img, type: 'handicap' })
+        }).then(function(r) { return r.json(); });
+      }));
+    })
+    .then(function(results) {
+      // Merge all extracted players
+      var extracted = {};
+      results.forEach(function(res) {
+        (res.players || []).forEach(function(ep) {
+          var key = ep.name.toLowerCase();
+          if (!extracted[key]) extracted[key] = ep;
+        });
+      });
+
+      // Match against our players
+      handicapProposals = [];
+      players.forEach(function(player) {
+        var ourFirst = player.name.trim().split(/\s+/)[0].toLowerCase();
+        var ourLast = player.name.trim().split(/\s+/).slice(-1)[0].toLowerCase();
+        
+        // Find best match by first+last name
+        var match = null;
+        Object.values(extracted).forEach(function(ep) {
+          var epParts = ep.name.toLowerCase().split(/\s+/);
+          var epFirst = epParts[0];
+          var epLast = epParts[epParts.length - 1];
+          if ((epFirst === ourFirst && epLast === ourLast) ||
+              (ep.name.toLowerCase().includes(ourFirst) && ep.name.toLowerCase().includes(ourLast))) {
+            match = ep;
+          }
+        });
+
+        if (match && match.handicap !== player.handicap) {
+          handicapProposals.push({
+            player: player,
+            newHandicap: match.handicap,
+            golfboxName: match.name,
+            approved: null
+          });
+        }
+      });
+
+      document.getElementById('handicapLoadingSection').classList.add('hidden');
+      renderHandicapProposals();
+    })
+    .catch(function(err) {
+      document.getElementById('handicapLoadingSection').classList.add('hidden');
+      document.getElementById('handicapProposals').innerHTML =
+        '<div style="color:#ef4444; padding:16px;">Fejl: ' + err.message + '</div>';
+    });
+}
+
+function renderHandicapProposals() {
+  var container = document.getElementById('handicapProposals');
+  if (!handicapProposals.length) {
+    container.innerHTML = '<div style="color:#B8AE95; padding:16px; font-style:italic;">Ingen ændringer fundet — alle handicap er opdaterede.</div>';
+    return;
+  }
+
+  var pending = handicapProposals.filter(function(p) { return p.approved === null; });
+  var html = '';
+
+  html += '<div style="font-family:Inter,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:#C9B071; margin-bottom:16px;">' +
+    pending.length + ' foreslåede ændringer</div>';
+
+  html += '<div style="margin-bottom:20px; display:flex; gap:8px;">';
+  html += '<button onclick="approveAllHandicap()" class="btn-primary" style="font-size:12px;">✓ Godkend alle</button>';
+  html += '<button onclick="saveApprovedHandicap()" class="btn-secondary" style="font-size:12px;">💾 Gem godkendte</button>';
+  html += '</div>';
+
+  handicapProposals.forEach(function(prop, idx) {
+    var diff = prop.newHandicap - prop.player.handicap;
+    var diffStr = diff > 0 ? '+' + diff.toFixed(1) : diff.toFixed(1);
+    var diffColor = diff > 0 ? '#ef8c34' : '#4ade80';
+    var borderColor = prop.approved === true ? 'rgba(74,222,128,0.4)' :
+                      prop.approved === false ? 'rgba(239,68,68,0.2)' : 'rgba(201,176,113,0.15)';
+
+    html += '<div style="display:flex; align-items:center; gap:12px; padding:14px; border:1px solid ' + borderColor + '; margin-bottom:8px; background:rgba(201,176,113,0.03);">';
+    
+    // Photo
+    if (prop.player.photo_url) {
+      html += '<img src="' + prop.player.photo_url + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;">';
+    } else {
+      html += '<div style="width:40px;height:40px;border-radius:50%;background:rgba(201,176,113,0.1);display:flex;align-items:center;justify-content:center;font-family:\'Crimson Text\',serif;font-size:18px;color:#C9B071;flex-shrink:0;">' + prop.player.name.charAt(0) + '</div>';
+    }
+
+    // Info
+    html += '<div style="flex:1;min-width:0;">';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:16px;color:#EFE7D2;">' + prop.player.name + '</div>';
+    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-top:2px;">' + prop.golfboxName + '</div>';
+    html += '</div>';
+
+    // HCP change
+    html += '<div style="text-align:center;flex-shrink:0;">';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:20px;color:#B8AE95;text-decoration:line-through;">' + prop.player.handicap.toFixed(1) + '</div>';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:22px;color:#EFE7D2;font-weight:600;">' + prop.newHandicap.toFixed(1) + '</div>';
+    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:' + diffColor + ';">' + diffStr + '</div>';
+    html += '</div>';
+
+    // Approve / Skip buttons
+    if (prop.approved === null) {
+      html += '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">';
+      html += '<button onclick="approveHandicap(' + idx + ')" style="background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.4);color:#4ade80;padding:6px 12px;cursor:pointer;font-size:13px;border-radius:2px;">✓</button>';
+      html += '<button onclick="skipHandicap(' + idx + ')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;padding:6px 12px;cursor:pointer;font-size:13px;border-radius:2px;">✗</button>';
+      html += '</div>';
+    } else if (prop.approved === true) {
+      html += '<div style="color:#4ade80;font-size:18px;flex-shrink:0;">✓</div>';
+    } else {
+      html += '<div style="color:#ef4444;font-size:18px;flex-shrink:0;">✗</div>';
+    }
+
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function approveHandicap(idx) {
+  handicapProposals[idx].approved = true;
+  renderHandicapProposals();
+}
+
+function skipHandicap(idx) {
+  handicapProposals[idx].approved = false;
+  renderHandicapProposals();
+}
+
+function approveAllHandicap() {
+  handicapProposals.forEach(function(p) { if (p.approved === null) p.approved = true; });
+  renderHandicapProposals();
+}
+
+function saveApprovedHandicap() {
+  var toSave = handicapProposals.filter(function(p) { return p.approved === true; });
+  if (!toSave.length) {
+    alert('Ingen godkendte ændringer at gemme.');
+    return;
+  }
+
+  var today = new Date().toISOString().split('T')[0];
+  var promises = toSave.map(function(prop) {
+    // Update handicap_history
+    var history = prop.player.handicap_history || [];
+    history.push({ date: today, handicap: prop.newHandicap });
+
+    return supabase.from('players').update({
+      handicap: prop.newHandicap,
+      handicap_history: history
+    }).eq('id', prop.player.id)
+      .then(function(res) {
+        if (res.error) throw res.error;
+        // Update local
+        prop.player.handicap = prop.newHandicap;
+        prop.player.handicap_history = history;
+      });
+  });
+
+  Promise.all(promises)
+    .then(function() {
+      handicapProposals = [];
+      document.getElementById('handicapProposals').innerHTML =
+        '<div style="color:#4ade80;padding:16px;">✓ ' + toSave.length + ' handicap opdateret!</div>';
+    })
+    .catch(function(err) {
+      document.getElementById('handicapProposals').innerHTML +=
+        '<div style="color:#ef4444;padding:8px;">Fejl: ' + err.message + '</div>';
+    });
 }
 
 function exportData() {

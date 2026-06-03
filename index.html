@@ -1111,7 +1111,13 @@ var players = [];
 var rounds = [];
 var archivedSeasons = [];
 var currentTab = 'leaderboard';
-var isLoggedIn = false;
+// Normalize points to 18-hole equivalent
+function normalizePoints(points, holes) {
+  if (holes === 'For9' || holes === 'Bag9') return points * 2;
+  return points;
+}
+
+var isLoggedIn = localStorage.getItem('tuesdayLogin') === 'true';
 var isAdmin = localStorage.getItem('tuesdayAdmin') === 'true';
 var currentAdminTab = 'players';
 var editingRound = null;
@@ -1918,6 +1924,7 @@ function checkPin() {
   if (currentPin === LOGIN_PIN) {
     console.log('✅ PIN Login SUCCESS');
     isLoggedIn = true;
+    localStorage.setItem('tuesdayLogin', 'true');
     
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
@@ -2249,6 +2256,7 @@ function updateRoundDate() {
 
 function handleLogout() {
   isLoggedIn = false;
+  localStorage.removeItem('tuesdayLogin');
   document.getElementById('mainApp').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
 }
@@ -3259,6 +3267,17 @@ function loadSupabase() {
 // ========== INITIALIZATION ==========
 function init() {
   console.log('🚀 Tuesday Club initialized');
+  
+  // Auto-login if previously logged in
+  if (isLoggedIn) {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    loadSupabase().then(loadPlayers).then(loadRounds).then(function() {
+      renderNavTabs();
+      renderContent();
+    });
+    return;
+  }
   
   // Init PIN buttons with visual touch feedback
   initPinButtons();

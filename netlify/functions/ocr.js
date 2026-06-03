@@ -17,7 +17,15 @@ exports.handler = async (event) => {
       return { statusCode: 500, body: JSON.stringify({ error: 'NVIDIA_API_KEY not configured' }) };
     }
 
-    const prompt = `This is a Golf GameBook app screenshot. Extract ONLY the player with the expanded scorecard grid visible (hole-by-hole rows). IGNORE players shown only in the leaderboard list.
+    const isHandicap = body.type === 'handicap';
+
+    const prompt = isHandicap
+      ? `This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value.
+HCP values can be positive numbers (e.g. 11.6, 27.9) or plus-handicap (e.g. +1.5, +2.9).
+Convert comma decimals to dots if needed.
+Return ONLY valid JSON, no markdown:
+{"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Martin Juul","handicap":20.3}]}`
+      : `This is a Golf GameBook app screenshot. Extract ONLY the player with the expanded scorecard grid visible (hole-by-hole rows). IGNORE players shown only in the leaderboard list.
 
 Extract:
 - name: exact player name from expanded scorecard

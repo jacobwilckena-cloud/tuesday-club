@@ -2793,11 +2793,47 @@ function handleImageUpload(event) {
     
     var matches = {};
     allPlayers.forEach(function(ep) {
-      var firstName = ep.name.trim().split(/\s+/)[0].toLowerCase();
-      var match = players.find(function(p) {
-        return p.name.trim().split(/\s+/)[0].toLowerCase() === firstName;
+      var epName = ep.name.trim().toLowerCase().replace(/\.\.\.$/, '').trim();
+      var epParts = epName.split(/\s+/);
+      var epFirst = epParts[0];
+      var epSecond = epParts[1] || '';
+
+      var bestMatch = null;
+      var bestScore = 0;
+
+      players.forEach(function(p) {
+        var pName = p.name.trim().toLowerCase();
+        var pParts = pName.split(/\s+/);
+        var pFirst = pParts[0];
+        var pSecond = pParts[1] || '';
+        var score = 0;
+
+        // First name match (most important)
+        if (pFirst === epFirst) score += 10;
+
+        // Second name starts with same letters (handles truncation like "Kretschmar P..." → "Pedersen")
+        if (epSecond && pSecond && pSecond.startsWith(epSecond)) score += 5;
+        if (epSecond && pSecond && epSecond.startsWith(pSecond)) score += 5;
+
+        // Full name contains match
+        if (pName.includes(epFirst) && epSecond && pName.includes(epSecond)) score += 8;
+
+        // OCR name is contained in player name (handles truncation)
+        if (pName.startsWith(epName)) score += 6;
+
+        // Check all OCR name parts appear in player name
+        var allPartsMatch = epParts.every(function(part) {
+          return part.length > 2 && pName.includes(part);
+        });
+        if (allPartsMatch && epParts.length >= 2) score += 7;
+
+        if (score > bestScore && score >= 10) {
+          bestScore = score;
+          bestMatch = p;
+        }
       });
-      if (match) matches[ep.name] = match.id;
+
+      if (bestMatch) matches[ep.name] = bestMatch.id;
     });
     
     ocrResult = { players: allPlayers, course: detectedCourse, holes: detectedHoles };

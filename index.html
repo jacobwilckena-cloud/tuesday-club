@@ -2752,9 +2752,15 @@ function handleImageUpload(event) {
         body: JSON.stringify({ image: img })
       })
       .then(function(response) {
-        return response.json().then(function(data) {
-          if (!response.ok) throw new Error('OCR fejl (' + response.status + '): ' + (data.error || JSON.stringify(data)));
-          return data;
+        return response.text().then(function(text) {
+          try {
+            var data = JSON.parse(text);
+            if (!response.ok) throw new Error('OCR fejl (' + response.status + '): ' + (data.error || text.substring(0, 200)));
+            return data;
+          } catch(e) {
+            if (e.message.indexOf('OCR fejl') === 0) throw e;
+            throw new Error('OCR svar kunne ikke læses (' + response.status + '): ' + text.substring(0, 200));
+          }
         });
       });
     }));

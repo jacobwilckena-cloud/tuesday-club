@@ -43,21 +43,27 @@ HCP values can be positive numbers (e.g. 11.6, 27.9) or plus-handicap (e.g. +1.5
 Convert comma decimals to dots if needed.
 Return ONLY valid JSON, no markdown:
 {"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Martin Juul","handicap":20.3}]}`
-      : `This is a Golf GameBook app screenshot. Extract ONLY the player with the expanded scorecard grid visible (hole-by-hole rows). IGNORE players shown only in the leaderboard list.
+      : `This is a Golf GameBook screenshot. ONE player has their scorecard expanded (showing a full grid with Hul/Handicap/Par/Score/Point rows). ALL other players are just summary rows in the leaderboard above.
 
-Extract:
-- name: exact player name from expanded scorecard
-- stableford: SECOND number in "Score XX/YY" → YY
-- grossScore: FIRST number in "Score XX/YY" → XX
-- birdies: holes where score < par (gross only, not net)
-- holeScores: Score row array e.g. [6,4,4,6,6,4,5,5,5]
-- holePars: Par row array e.g. [4,4,3,5,4,3,4,4,4]
-- holes: "For9" holes 1-9, "Bag9" holes 10-18, "18" full round
-- course: course name
-- date: from "Game MM/DD/YYYY" at top → ISO "YYYY-MM-DD" e.g. "Game 4/21/2026" → "2026-04-21"
+STEP 1: Find the expanded scorecard grid - it shows individual hole data in a table.
+STEP 2: Read the PLAYER NAME shown just above or in that expanded scorecard section.
+STEP 3: Read the Score row (actual strokes per hole) and Par row from the grid.
+STEP 4: Find "Score X/Y" at the bottom of the expanded section - X = gross strokes, Y = stableford points.
+STEP 5: DO NOT use any data from the leaderboard summary rows for the expanded player.
 
-ONLY valid JSON, no markdown, no backticks:
-{"course":"...","holes":"For9","date":"2026-04-21","players":[{"name":"...","stableford":16,"grossScore":45,"birdies":0,"holeScores":[6,4,4,6,6,4,5,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}`;
+Extract ONLY the expanded player:
+- name: player name from the expanded scorecard section
+- stableford: Y from "Score X/Y" at bottom (stableford points total)
+- grossScore: X from "Score X/Y" (total strokes)
+- holeScores: array from Score row left to right (exclude the "Ud" total)
+- holePars: array from Par row left to right (exclude the "Ud" total)
+- holes: "For9" if holes 1-9, "Bag9" if 10-18, "18" if full
+- course: course name from top
+- date: from "Game MM/DD/YYYY" → "YYYY-MM-DD"
+- birdies: 0 (will be calculated separately)
+
+ONLY valid JSON, no other text:
+{"course":"...","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"birdies":0,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}`;
 
     const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',

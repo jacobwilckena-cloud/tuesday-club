@@ -2688,24 +2688,28 @@ function handleAddRound(event) {
     roundData.scores[playerId] = { stableford: stableford, grossScore: gross, birdies: birdies };
   }
 
+  var submitBtn = document.querySelector('#addRoundForm button[type="submit"]');
+  if (submitBtn) { submitBtn.textContent = 'Gemmer...'; submitBtn.disabled = true; }
+
   saveRound(roundData)
     .then(function(result) {
-      successDiv.textContent = 'Runde gemt! 🎉';
+      successDiv.textContent = '✅ Runde gemt!';
       successDiv.classList.remove('hidden');
-      
-      // Clear multiplayer data
       window.pendingMultiplayerRound = null;
       renderMultiplayerForm();
-      
       return loadRounds();
     })
     .then(function() {
       renderContent();
-      setTimeout(closeAddRoundModal, 1500);
+      setTimeout(closeAddRoundModal, 2000);
     })
     .catch(function(error) {
-      errorDiv.textContent = 'Fejl: ' + error.message;
+      errorDiv.textContent = '❌ Fejl: ' + error.message;
       errorDiv.classList.remove('hidden');
+      errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    })
+    .finally(function() {
+      if (submitBtn) { submitBtn.textContent = 'Gem Runde'; submitBtn.disabled = false; }
     });
 }
 

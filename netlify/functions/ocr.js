@@ -18,6 +18,24 @@ exports.handler = async (event) => {
     }
 
     const isHandicap = body.type === 'handicap';
+    const isSummary = body.type === 'summary';
+
+    if (isSummary) {
+      const summaryPrompt = `Du er en golf-kommentator for Tuesday Club hos Mølleåens Golfklub. Skriv en kort, personlig sæsonanalyse på dansk (3-5 sætninger) for spilleren baseret på nedenstående data. Inkluder deres placering på leaderboardet, form, og sammenlign lidt med de andre spillere. Vær positiv men ærlig. Brug golfterminologi. Skriv i tredje person.\n\n${body.context}`;
+      
+      const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'meta/llama-3.1-70b-instruct',
+          messages: [{ role: 'user', content: summaryPrompt }],
+          max_tokens: 300, temperature: 0.7
+        })
+      });
+      const data = await response.json();
+      const summary = data.choices?.[0]?.message?.content || '';
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary }) };
+    }
 
     const prompt = isHandicap
       ? `This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value.

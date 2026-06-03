@@ -87,8 +87,11 @@ ONLY valid JSON, no markdown, no backticks:
 
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || '';
-    const clean = text.trim()
-      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    
+    // Extract JSON from anywhere in the response (model may add text before/after)
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Ingen scorecard data fundet i svaret');
+    const clean = jsonMatch[0];
 
     return {
       statusCode: 200,

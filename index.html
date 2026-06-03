@@ -2414,6 +2414,30 @@ function handleAddRound(event) {
 }
 
 // ========== OCR / IMAGE UPLOAD ==========
+function compressImage(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        var maxW = 1200;
+        var scale = Math.min(1, maxW / img.width);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        resolve(dataUrl.split(',')[1]);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function handleImageUpload(event) {
   var files = Array.from(event.target.files || []);
   if (files.length === 0) return;
@@ -2422,16 +2446,7 @@ function handleImageUpload(event) {
   ocrError = '';
   renderAddRoundModal();
   
-  Promise.all(files.map(function(file) {
-    return new Promise(function(resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function() {
-        resolve(reader.result.split(',')[1]);
-      };
-      reader.onerror = function() { reject(new Error('Kunne ikke læse ' + file.name)); };
-      reader.readAsDataURL(file);
-    });
-  }))
+  Promise.all(files.map(function(file) { return compressImage(file); }))
   .then(function(base64Images) {
     // Call Netlify Function instead of Claude API directly
     return fetch('/.netlify/functions/ocr', {

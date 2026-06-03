@@ -2808,6 +2808,9 @@ function handleImageUpload(event) {
         var pSecond = pParts[1] || '';
         var score = 0;
 
+        // Exact full name match (highest priority)
+        if (pName === epName) score += 20;
+
         // First name match (most important)
         if (pFirst === epFirst) score += 10;
 
@@ -2874,12 +2877,23 @@ function applyOcrToForm() {
     var playerId = ocrMatches[ep.name];
     if (playerId) {
       participants.push(playerId);
+      
+      // Calculate birdies from holeScores (reliable) instead of model count
+      var holeScores = ep.holeScores || [];
+      var holePars = ep.holePars || [];
+      var calculatedBirdies = 0;
+      for (var hi = 0; hi < holeScores.length; hi++) {
+        if (holePars[hi] && holeScores[hi] < holePars[hi]) calculatedBirdies++;
+      }
+      // Use calculated if we have hole data, otherwise fall back to model count
+      var birdies = holeScores.length > 0 ? calculatedBirdies : (ep.birdies || 0);
+      
       scores[playerId] = {
         stableford: ep.stableford || 0,
         grossScore: ep.grossScore || 0,
-        birdies: ep.birdies || 0,
-        holeScores: ep.holeScores || [],
-        holePars: ep.holePars || []
+        birdies: birdies,
+        holeScores: holeScores,
+        holePars: holePars
       };
     }
   });

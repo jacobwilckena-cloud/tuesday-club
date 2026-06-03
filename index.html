@@ -1122,6 +1122,7 @@ console.log('=== TUESDAY CLUB - FINAL VERSION ===');
 // ========== CONFIGURATION ==========
 var SUPABASE_URL = "https://fhfzxfjzkcojbgrsbkgz.supabase.co";
 var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZnp4Zmp6a2NvamJncnNia2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNDI5NTAsImV4cCI6MjA5MjYxODk1MH0.k1o3ZUDt_bJae3tnBi3jKpowbtVmwdusDtOCm41tfyU";
+var NVIDIA_API_KEY = "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";
 var LOGIN_PIN = "1234";
 var ADMIN_PIN = "2606";
 var currentPin = "";
@@ -2748,24 +2749,32 @@ function handleImageUpload(event) {
   
   Promise.all(files.map(function(file) { return compressImage(file); }))
   .then(function(base64Images) {
-    // Call OCR function ONCE PER IMAGE in parallel (avoids 30s timeout)
+    var prompt = 'Golf GameBook scorecard screenshot. Find the ONE player with the full hole grid (Par row + Score row visible). Ignore leaderboard-only rows.\n\nReturn JSON only, no other text:\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"birdies":0,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules: stableford=second number in "Score X/Y", grossScore=first. holeScores=Score row. holePars=Par row. date from "Game MM/DD/YYYY". birdies=0 always.';
+
+    // Call NVIDIA directly from browser — no Netlify timeout!
     return Promise.all(base64Images.map(function(img) {
-      return fetch('/.netlify/functions/ocr', {
+      return fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: img })
+        headers: {
+          'Authorization': 'Bearer ' + NVIDIA_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'meta/llama-3.2-11b-vision-instruct',
+          messages: [{ role: 'user', content: [
+            { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + img } },
+            { type: 'text', text: prompt }
+          ]}],
+          max_tokens: 250,
+          temperature: 0.1
+        })
       })
-      .then(function(response) {
-        return response.text().then(function(text) {
-          try {
-            var data = JSON.parse(text);
-            if (!response.ok) throw new Error('OCR fejl (' + response.status + '): ' + (data.error || text.substring(0, 200)));
-            return data;
-          } catch(e) {
-            if (e.message.indexOf('OCR fejl') === 0) throw e;
-            throw new Error('OCR svar kunne ikke læses (' + response.status + '): ' + text.substring(0, 200));
-          }
-        });
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+        var match = text.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('Ingen scorecard data i svaret');
+        return JSON.parse(match[0]);
       });
     }));
   })

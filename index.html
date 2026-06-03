@@ -1471,13 +1471,13 @@ function renderLeaderboard() {
   
   // Tabs for 9h og 18h
   html += '<div class="leaderboard-tabs" style="border-bottom: 1px solid rgba(201,176,113,0.2); margin-bottom: 30px; display: flex; gap: 0;">' +
-    '<button id="tab-18h" class="tab-btn" onclick="switchLeaderboardTab(\'18h\')" style="cursor:pointer; padding: 12px 24px; border: none; background: none; color: #C9B071; font-size: 16px; font-family: \'Crimson Text\', serif; border-bottom: 2px solid #C9B071; cursor: pointer;">18-hullers</button>' +
-    '<button id="tab-9h" class="tab-btn" onclick="switchLeaderboardTab(\'9h\')" style="cursor:pointer; padding: 12px 24px; border: none; background: none; color: #999; font-size: 16px; font-family: \'Crimson Text\', serif; border-bottom: 2px solid transparent; cursor: pointer;">9-hullers</button>' +
+    '<button id="tab-9h" class="tab-btn" onclick="switchLeaderboardTab(\'9h\')" style="cursor:pointer; padding: 12px 24px; border: none; background: none; color: #C9B071; font-size: 16px; font-family: \'Crimson Text\', serif; border-bottom: 2px solid #C9B071; cursor: pointer;">9-hullers</button>' +
+    '<button id="tab-18h" class="tab-btn" onclick="switchLeaderboardTab(\'18h\')" style="cursor:pointer; padding: 12px 24px; border: none; background: none; color: #999; font-size: 16px; font-family: \'Crimson Text\', serif; border-bottom: 2px solid transparent; cursor: pointer;">18-hullers</button>' +
     '</div>';
   
   function renderBoardForType(boardType, label) {
     var stats = boardType === '18h' ? data.leaderboard18h : data.leaderboard9h;
-    var boardHtml = '<div id="board-' + boardType + '" class="leaderboard-board" style="display: ' + (boardType === '18h' ? 'block' : 'none') + ';">';
+    var boardHtml = '<div id="board-' + boardType + '" class="leaderboard-board" style="display: ' + (boardType === '9h' ? 'block' : 'none') + ';">';
     
     var leader = stats.length > 0 ? stats[0] : null;
     
@@ -1544,8 +1544,8 @@ function renderLeaderboard() {
     return boardHtml;
   }
   
-  html += renderBoardForType('18h', '18-hullers');
   html += renderBoardForType('9h', '9-hullers');
+  html += renderBoardForType('18h', '18-hullers');
   
   return html;
 }

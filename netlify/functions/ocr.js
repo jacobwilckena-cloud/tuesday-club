@@ -56,13 +56,7 @@ Extract for the EXPANDED player (the one with the full scorecard grid visible - 
 - holeScores: array of stroke numbers from the Score row, left to right (e.g. [6,4,4,6,6,4,5,5,5])
 - holePars: array of par values from the Par row, left to right (e.g. [4,4,3,5,4,3,4,4,4])
 
-Also extract from the leaderboard rows above (players without expanded scorecard):
-- name: player name
-- stableford: number in the SCORE column (e.g. 20)
-- grossScore: 0 (not visible)
-- birdies: 0
-- holeScores: []
-- holePars: []
+IMPORTANT: Only extract the ONE player who has the expanded scorecard grid visible (with individual hole scores). IGNORE all other players shown only in the leaderboard list above. Return only 1 player in the array.
 
 holes: "For9" if hole numbers 1-9, "Bag9" if 10-18, "18" if full round
 

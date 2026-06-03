@@ -1455,13 +1455,20 @@ function saveRound(roundData) {
 
   if (!sanitized.date) return Promise.reject(new Error('Mangler dato'));
 
-  console.log('💾 Saving round:', JSON.stringify(sanitized));
+  console.log('💾 Saving round data:', JSON.stringify(sanitized));
 
   return supabase.from('rounds').insert([sanitized]).select()
     .then(function(result) {
       if (result.error) {
+        var errDetail = [
+          result.error.message,
+          result.error.details,
+          result.error.hint,
+          result.error.code,
+          'Data: ' + JSON.stringify(sanitized)
+        ].filter(Boolean).join(' | ');
         console.error('Supabase error:', result.error);
-        throw new Error(result.error.message || result.error.details || result.error.hint || JSON.stringify(result.error));
+        throw new Error(errDetail);
       }
       return result.data[0];
     });

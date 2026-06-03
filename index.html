@@ -1740,127 +1740,245 @@ function renderMembers() {
 function renderStatistics() {
   var html = '<div class="rounds-list">';
   html += '<h2 style="font-size: 32px; color: #C9B071; margin-bottom: 32px;">Statistik</h2>';
-  
-  // === BIRDIE RANKINGS ===
-  html += '<div class="round-card" style="margin-bottom: 32px;">';
-  html += '<h3 style="font-size: 24px; color: #EFE7D2; margin-bottom: 16px;">🦅 Birdie Kings</h3>';
-  
-  var birdieRankings = players.map(function(p) {
-    var stats = getPlayerStats(p.id);
-    return {
-      name: p.name,
-      photo_url: p.photo_url,
-      totalBirdies: stats.totalBirdies,
-      rounds: stats.rounds,
-      avgBirdies: stats.rounds > 0 ? (stats.totalBirdies / stats.rounds).toFixed(1) : 0
-    };
-  }).filter(function(p) { return p.totalBirdies > 0; })
-    .sort(function(a, b) { return b.totalBirdies - a.totalBirdies; })
-    .slice(0, 5);
-  
-  for (var i = 0; i < birdieRankings.length; i++) {
-    var p = birdieRankings[i];
-    var photoHtml = '';
-    if (p.photo_url) {
-      photoHtml = '<img src="' + p.photo_url + '" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(201,176,113,0.3);">';
-    } else {
-      photoHtml = '<div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(201,176,113,0.1); display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 18px; color: #C9B071; border: 2px solid rgba(201,176,113,0.3);">' + p.name.charAt(0) + '</div>';
-    }
-    
-    html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(201,176,113,0.1);">';
-    html += '<div style="display: flex; align-items: center; gap: 12px;">';
-    html += '<div style="font-family: Inter, sans-serif; font-size: 18px; color: #C9B071; font-weight: 600; width: 24px;">' + (i + 1) + '</div>';
-    html += photoHtml;
-    html += '<div style="font-family: \'Crimson Text\', serif; font-size: 17px; color: #EFE7D2;">' + p.name + '</div>';
-    html += '</div>';
-    html += '<div style="display: flex; align-items: center; gap: 16px;">';
-    html += '<div style="text-align: right;"><div style="font-family: Inter, sans-serif; font-size: 9px; color: #B8AE95;">TOTAL</div><div style="font-family: \'Crimson Text\', serif; font-size: 20px; color: #C9B071; font-weight: 600;">' + p.totalBirdies + '</div></div>';
-    html += '<div style="text-align: right;"><div style="font-family: Inter, sans-serif; font-size: 9px; color: #B8AE95;">Ø PER RUNDE</div><div style="font-family: \'Crimson Text\', serif; font-size: 16px; color: #EFE7D2;">' + p.avgBirdies + '</div></div>';
-    html += '</div>';
-    html += '</div>';
-  }
-  html += '</div>';
-  
-  // === BEST ROUNDS ===
-  html += '<div class="round-card" style="margin-bottom: 32px;">';
-  html += '<h3 style="font-size: 24px; color: #EFE7D2; margin-bottom: 16px;">🏆 Top 10 Runder</h3>';
-  
-  var allRounds = [];
-  for (var i = 0; i < rounds.length; i++) {
-    var round = rounds[i];
-    for (var j = 0; j < round.participants.length; j++) {
-      var playerId = round.participants[j];
-      var player = players.find(function(p) { return p.id === playerId; });
-      if (!player) continue;
-      
-      var score = round.scores[playerId];
-      if (!score) continue;
-      
-      var normalizedPoints = normalizePoints(score.stableford, round.holes);
-      allRounds.push({
-        playerName: player.name,
-        photo_url: player.photo_url,
-        points: normalizedPoints,
-        date: round.date,
-        course: round.course,
-        holes: round.holes
-      });
-    }
-  }
-  
-  allRounds.sort(function(a, b) { return b.points - a.points; });
-  var topRounds = allRounds.slice(0, 10);
-  
-  for (var i = 0; i < topRounds.length; i++) {
-    var r = topRounds[i];
-    var photoHtml = '';
-    if (r.photo_url) {
-      photoHtml = '<img src="' + r.photo_url + '" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(201,176,113,0.3);">';
-    } else {
-      photoHtml = '<div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(201,176,113,0.1); display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 16px; color: #C9B071; border: 2px solid rgba(201,176,113,0.3);">' + r.playerName.charAt(0) + '</div>';
-    }
-    
-    html += '<div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(201,176,113,0.1);">';
-    html += '<div style="display: flex; align-items: center; gap: 12px;">';
-    html += '<div style="font-family: Inter, sans-serif; font-size: 16px; color: #C9B071; font-weight: 600; width: 24px;">' + (i + 1) + '</div>';
-    html += photoHtml;
-    html += '<div>';
-    html += '<div style="font-family: \'Crimson Text\', serif; font-size: 16px; color: #EFE7D2;">' + r.playerName + '</div>';
-    html += '<div style="font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95;">' + r.date + ' · ' + holesLabel(r.holes) + '</div>';
-    html += '</div>';
-    html += '</div>';
-    html += '<div style="font-family: \'Crimson Text\', serif; font-size: 24px; color: #C9B071; font-weight: 600;">' + r.points + '</div>';
-    html += '</div>';
-  }
-  html += '</div>';
-  
-  // === SEASON OVERVIEW ===
-  html += '<div class="round-card">';
-  html += '<h3 style="font-size: 24px; color: #EFE7D2; margin-bottom: 16px;">📊 Sæson Oversigt</h3>';
+
+  // ===== 1. SEASON OVERVIEW =====
+  html += '<div class="round-card" style="margin-bottom: 24px;">';
+  html += '<h3 style="font-size: 22px; color: #EFE7D2; margin-bottom: 20px;">📊 Sæson Oversigt</h3>';
   
   var totalRounds = rounds.length;
-  var totalPlayers = players.length;
   var totalBirdies = 0;
-  for (var i = 0; i < players.length; i++) {
-    totalBirdies += getPlayerStats(players[i].id).totalBirdies;
+  var allScores = [];
+  rounds.forEach(function(r) {
+    (r.participants || []).forEach(function(pid) {
+      if (r.scores && r.scores[pid]) {
+        totalBirdies += (r.scores[pid].birdies || 0);
+        allScores.push(r.scores[pid].stableford || 0);
+      }
+    });
+  });
+  var avgScore = allScores.length ? (allScores.reduce(function(a,b){return a+b;},0)/allScores.length).toFixed(1) : '—';
+  var bestScore = allScores.length ? Math.max.apply(null, allScores) : '—';
+
+  html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
+  function statCard(label, val, sub) {
+    return '<div style="background:rgba(201,176,113,0.05);border:1px solid rgba(201,176,113,0.15);padding:16px;text-align:center;">' +
+      '<div style="font-family:Inter,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#B8AE95;margin-bottom:8px;">' + label + '</div>' +
+      '<div style="font-family:\'Crimson Text\',serif;font-size:28px;color:#C9B071;font-weight:600;">' + val + '</div>' +
+      (sub ? '<div style="font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;margin-top:4px;">' + sub + '</div>' : '') +
+      '</div>';
   }
+  html += statCard('Runder', totalRounds, '');
+  html += statCard('Spillere', players.length, 'tilmeldt');
+  html += statCard('Snit score', avgScore, 'stableford pts');
+  html += statCard('Birdies', totalBirdies, 'i alt');
+  html += '</div></div>';
+
+  // ===== 2. BIRDIE KINGS =====
+  var birdieKings = players.map(function(p) {
+    var s = getPlayerStats(p.id);
+    return { name: p.name, photo_url: p.photo_url, birdies: s.totalBirdies, rounds: s.rounds,
+             avg: s.rounds > 0 ? (s.totalBirdies/s.rounds).toFixed(2) : 0 };
+  }).filter(function(p){ return p.birdies > 0; })
+    .sort(function(a,b){ return b.birdies - a.birdies; }).slice(0,5);
+
+  if (birdieKings.length > 0) {
+    html += '<div class="round-card" style="margin-bottom:24px;">';
+    html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:20px;">🦅 Birdie Kings</h3>';
+    birdieKings.forEach(function(p, i) {
+      var photo = p.photo_url
+        ? '<img src="'+p.photo_url+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
+        : '<div style="width:36px;height:36px;border-radius:50%;background:rgba(201,176,113,0.1);display:flex;align-items:center;justify-content:center;font-family:\'Crimson Text\',serif;color:#C9B071;flex-shrink:0;">'+p.name.charAt(0)+'</div>';
+      var barW = Math.round((p.birdies / birdieKings[0].birdies) * 100);
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">';
+      html += '<div style="font-family:Inter,sans-serif;font-size:12px;color:#C9B071;width:16px;">'+( i+1)+'</div>';
+      html += photo;
+      html += '<div style="flex:1;">';
+      html += '<div style="font-family:\'Crimson Text\',serif;font-size:15px;color:#EFE7D2;">'+p.name+'</div>';
+      html += '<div style="height:6px;background:rgba(201,176,113,0.1);border-radius:3px;margin-top:4px;">';
+      html += '<div style="height:6px;width:'+barW+'%;background:#C9B071;border-radius:3px;transition:width 0.6s;"></div></div>';
+      html += '</div>';
+      html += '<div style="text-align:right;flex-shrink:0;"><div style="font-family:\'Crimson Text\',serif;font-size:20px;color:#C9B071;font-weight:600;">'+p.birdies+'</div>';
+      html += '<div style="font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;">'+p.avg+'/runde</div></div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ===== 3. FORM (seneste 5 runder per spiller) =====
+  html += '<div class="round-card" style="margin-bottom:24px;">';
+  html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:20px;">📈 Form</h3>';
+  html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Seneste 5 runder · Stableford</p>';
   
-  html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">';
-  html += '<div style="background: rgba(201,176,113,0.05); padding: 20px; border: 1px solid rgba(201,176,113,0.2); text-align: center;">';
-  html += '<div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 8px;">Total Runder</div>';
-  html += '<div style="font-family: \'Crimson Text\', serif; font-size: 32px; color: #EFE7D2; font-weight: 600;">' + totalRounds + '</div>';
+  var activePlayers = players.filter(function(p){ return getPlayerStats(p.id).rounds > 0; });
+  if (activePlayers.length === 0) {
+    html += '<div style="color:#B8AE95;font-style:italic;">Ingen data endnu</div>';
+  } else {
+    activePlayers.forEach(function(p) {
+      var prounds = rounds.filter(function(r) {
+        return r.participants && r.participants.includes(p.id) && r.scores && r.scores[p.id];
+      }).sort(function(a,b){ return new Date(b.date)-new Date(a.date); }).slice(0,5);
+      
+      if (!prounds.length) return;
+      
+      var scores5 = prounds.map(function(r){ return r.scores[p.id].stableford; });
+      var maxS = Math.max.apply(null, scores5) || 1;
+      var trend = scores5.length >= 2 ? scores5[0] - scores5[scores5.length-1] : 0;
+      var trendIcon = trend > 0 ? '↑' : trend < 0 ? '↓' : '→';
+      var trendColor = trend > 0 ? '#4ade80' : trend < 0 ? '#ef4444' : '#B8AE95';
+      
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">';
+      if (p.photo_url) {
+        html += '<img src="'+p.photo_url+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">';
+      } else {
+        html += '<div style="width:36px;height:36px;border-radius:50%;background:rgba(201,176,113,0.1);display:flex;align-items:center;justify-content:center;font-family:\'Crimson Text\',serif;color:#C9B071;flex-shrink:0;">'+p.name.charAt(0)+'</div>';
+      }
+      html += '<div style="flex:1;">';
+      html += '<div style="font-family:\'Crimson Text\',serif;font-size:15px;color:#EFE7D2;margin-bottom:6px;">'+p.name+'</div>';
+      // Mini bar chart
+      html += '<div style="display:flex;align-items:flex-end;gap:3px;height:28px;">';
+      for (var si = scores5.length-1; si >= 0; si--) {
+        var barH = Math.max(4, Math.round((scores5[si]/maxS)*28));
+        var isLatest = si === 0;
+        html += '<div style="width:14px;height:'+barH+'px;background:'+(isLatest?'#C9B071':'rgba(201,176,113,0.3)')+';border-radius:2px 2px 0 0;" title="'+scores5[si]+' pts"></div>';
+      }
+      html += '</div>';
+      html += '</div>';
+      html += '<div style="text-align:center;flex-shrink:0;">';
+      html += '<div style="font-size:18px;color:'+trendColor+';">'+trendIcon+'</div>';
+      html += '<div style="font-family:\'Crimson Text\',serif;font-size:18px;color:#EFE7D2;font-weight:600;">'+scores5[0]+'</div>';
+      html += '<div style="font-family:Inter,sans-serif;font-size:9px;color:#B8AE95;">seneste</div>';
+      html += '</div>';
+      html += '</div>';
+    });
+  }
   html += '</div>';
-  html += '<div style="background: rgba(201,176,113,0.05); padding: 20px; border: 1px solid rgba(201,176,113,0.2); text-align: center;">';
-  html += '<div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 8px;">Aktive Spillere</div>';
-  html += '<div style="font-family: \'Crimson Text\', serif; font-size: 32px; color: #EFE7D2; font-weight: 600;">' + totalPlayers + '</div>';
+
+  // ===== 4. HUL-STATISTIK (fra holeScores data) =====
+  var holeDataRounds = rounds.filter(function(r) {
+    return r.participants && r.participants.some(function(pid) {
+      return r.scores && r.scores[pid] && r.scores[pid].holeScores && r.scores[pid].holeScores.length > 0;
+    });
+  });
+
+  if (holeDataRounds.length > 0) {
+    // Aggregate per-hole stats
+    var holeStats = {}; // hole number → {totalDiff, count}
+    holeDataRounds.forEach(function(r) {
+      (r.participants || []).forEach(function(pid) {
+        var sc = r.scores && r.scores[pid];
+        if (!sc || !sc.holeScores || !sc.holePars) return;
+        var startHole = (r.holes === 'Bag9') ? 10 : 1;
+        sc.holeScores.forEach(function(strokes, i) {
+          var holeNum = startHole + i;
+          var par = sc.holePars[i];
+          var diff = strokes - par;
+          if (!holeStats[holeNum]) holeStats[holeNum] = { total: 0, count: 0, birdies: 0 };
+          holeStats[holeNum].total += diff;
+          holeStats[holeNum].count++;
+          if (diff < 0) holeStats[holeNum].birdies++;
+        });
+      });
+    });
+
+    var holeNums = Object.keys(holeStats).map(Number).sort(function(a,b){return a-b;});
+    if (holeNums.length > 0) {
+      html += '<div class="round-card" style="margin-bottom:24px;">';
+      html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">🕳️ Hulstatistik</h3>';
+      html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Gennemsnit vs par · Alle spillere</p>';
+      
+      html += '<div style="overflow-x:auto;"><div style="display:flex;gap:8px;min-width:max-content;">';
+      holeNums.forEach(function(h) {
+        var hs = holeStats[h];
+        var avg = hs.total / hs.count;
+        var avgStr = avg >= 0 ? '+'+avg.toFixed(1) : avg.toFixed(1);
+        var col = avg <= -0.5 ? '#C9B071' : avg <= 0.5 ? '#4ade80' : avg <= 1.5 ? '#B8AE95' : '#ef8c34';
+        html += '<div style="text-align:center;min-width:36px;">';
+        html += '<div style="font-family:Inter,sans-serif;font-size:9px;color:#B8AE95;margin-bottom:4px;">'+h+'</div>';
+        html += '<div style="font-family:\'Crimson Text\',serif;font-size:14px;color:'+col+';font-weight:600;">'+avgStr+'</div>';
+        if (hs.birdies > 0) {
+          html += '<div style="font-size:9px;color:#C9B071;margin-top:2px;">🐦'+hs.birdies+'</div>';
+        }
+        html += '</div>';
+      });
+      html += '</div></div>';
+      html += '</div>';
+    }
+  }
+
+  // ===== 5. HEAD-TO-HEAD =====
+  var activePls = players.filter(function(p){ return getPlayerStats(p.id).rounds > 0; });
+  if (activePls.length >= 2) {
+    html += '<div class="round-card" style="margin-bottom:24px;">';
+    html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">⚔️ Head-to-Head</h3>';
+    html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Wins når begge spiller samme runde</p>';
+
+    for (var i = 0; i < activePls.length; i++) {
+      for (var j = i+1; j < activePls.length; j++) {
+        var p1 = activePls[i]; var p2 = activePls[j];
+        var p1wins = 0; var p2wins = 0; var ties = 0;
+        rounds.forEach(function(r) {
+          if (!r.participants || !r.scores) return;
+          if (r.participants.includes(p1.id) && r.participants.includes(p2.id)) {
+            var s1 = (r.scores[p1.id] || {}).stableford || 0;
+            var s2 = (r.scores[p2.id] || {}).stableford || 0;
+            if (s1 > s2) p1wins++;
+            else if (s2 > s1) p2wins++;
+            else ties++;
+          }
+        });
+        var total = p1wins + p2wins + ties;
+        if (total === 0) continue;
+        var p1pct = Math.round((p1wins/total)*100);
+        var p2pct = Math.round((p2wins/total)*100);
+
+        html += '<div style="margin-bottom:16px;">';
+        html += '<div style="display:flex;justify-content:space-between;font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:4px;">';
+        html += '<span>'+p1.name.split(' ')[0]+'</span><span>'+p2.name.split(' ')[0]+'</span></div>';
+        html += '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(201,176,113,0.1);">';
+        if (p1pct > 0) html += '<div style="width:'+p1pct+'%;background:#C9B071;"></div>';
+        if (ties > 0) html += '<div style="flex:0 0 auto;width:'+(Math.round((ties/total)*100))+'%;background:rgba(201,176,113,0.3);"></div>';
+        if (p2pct > 0) html += '<div style="width:'+p2pct+'%;background:rgba(201,176,113,0.5);margin-left:auto;"></div>';
+        html += '</div>';
+        html += '<div style="display:flex;justify-content:space-between;font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;margin-top:2px;">';
+        html += '<span>'+p1wins+'W ('+p1pct+'%)</span>';
+        if (ties) html += '<span>'+ties+' tie</span>';
+        html += '<span>'+p2wins+'W ('+p2pct+'%)</span></div>';
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+
+  // ===== 6. TOP 10 RUNDER =====
+  html += '<div class="round-card">';
+  html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:20px;">🏆 Top 10 Runder</h3>';
+  var allRounds = [];
+  rounds.forEach(function(r) {
+    (r.participants || []).forEach(function(pid) {
+      var pl = players.find(function(p){ return p.id === pid; });
+      var sc = r.scores && r.scores[pid];
+      if (!pl || !sc) return;
+      allRounds.push({ playerName: pl.name, photo_url: pl.photo_url,
+        date: r.date, holes: r.holes, points: sc.stableford || 0 });
+    });
+  });
+  allRounds.sort(function(a,b){ return b.points-a.points; });
+  allRounds.slice(0,10).forEach(function(r, i) {
+    var photo = r.photo_url
+      ? '<img src="'+r.photo_url+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">'
+      : '<div style="width:36px;height:36px;border-radius:50%;background:rgba(201,176,113,0.1);display:flex;align-items:center;justify-content:center;font-family:\'Crimson Text\',serif;color:#C9B071;">'+r.playerName.charAt(0)+'</div>';
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(201,176,113,0.08);">';
+    html += '<div style="font-family:Inter,sans-serif;font-size:13px;color:#C9B071;font-weight:600;width:20px;">'+(i+1)+'</div>';
+    html += photo;
+    html += '<div style="flex:1;">';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:16px;color:#EFE7D2;">'+r.playerName+'</div>';
+    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">'+r.date+' · '+holesLabel(r.holes)+'</div>';
+    html += '</div>';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:26px;color:#C9B071;font-weight:600;">'+r.points+'</div>';
+    html += '</div>';
+  });
   html += '</div>';
-  html += '<div style="background: rgba(201,176,113,0.05); padding: 20px; border: 1px solid rgba(201,176,113,0.2); text-align: center;">';
-  html += '<div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 8px;">Total Birdies</div>';
-  html += '<div style="font-family: \'Crimson Text\', serif; font-size: 32px; color: #C9B071; font-weight: 600;">' + totalBirdies + '</div>';
-  html += '</div>';
-  html += '</div>';
-  html += '</div>';
-  
+
   html += '</div>';
   return html;
 }

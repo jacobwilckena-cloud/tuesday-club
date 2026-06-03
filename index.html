@@ -2461,10 +2461,12 @@ function handleImageUpload(event) {
     var allPlayers = [];
     var detectedCourse = null;
     var detectedHoles = null;
+    var detectedDate = null;
     
     results.forEach(function(res) {
       if (res.course && !detectedCourse) detectedCourse = res.course;
       if (res.holes && !detectedHoles) detectedHoles = res.holes;
+      if (res.date && !detectedDate) detectedDate = res.date;
       (res.players || []).forEach(function(ep) {
         var existing = allPlayers.find(function(p) { return p.name.toLowerCase() === ep.name.toLowerCase(); });
         if (!existing) {
@@ -2492,6 +2494,15 @@ function handleImageUpload(event) {
     
     if (detectedHoles) document.getElementById('roundHoles').value = detectedHoles;
     if (detectedCourse) document.getElementById('roundCourse').value = detectedCourse;
+    
+    // Pre-fill date from scorecard
+    if (detectedDate && detectedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      var parts = detectedDate.split('-');
+      document.getElementById('roundYear').value = parts[0];
+      document.getElementById('roundMonth').value = parts[1];
+      document.getElementById('roundDay').value = String(parseInt(parts[2]));
+      updateRoundDate();
+    }
     
     renderAddRoundModal();
   })

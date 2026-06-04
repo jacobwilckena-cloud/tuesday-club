@@ -43,12 +43,20 @@ HCP values can be positive numbers (e.g. 11.6, 27.9) or plus-handicap (e.g. +1.5
 Convert comma decimals to dots if needed.
 Return ONLY valid JSON, no markdown:
 {"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Martin Juul","handicap":20.3}]}`
-      : `Golf GameBook scorecard screenshot. Find the ONE player with the full hole grid (Par row + Score row visible). Ignore leaderboard-only rows.
+      : `Golf GameBook scorecard. The expanded player has a grid showing Par/Score/Point rows for each hole.
 
-Return JSON only, no other text:
+Return JSON only, no text before or after:
 {"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"birdies":0,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}
 
-Rules: stableford=second number in "Score X/Y", grossScore=first number. holeScores=Score row values. holePars=Par row values. date from "Game MM/DD/YYYY". birdies=0 always.`;
+Rules:
+- name: the player with expanded hole grid
+- stableford: second number in "Score X/Y" at bottom
+- grossScore: first number in "Score X/Y"
+- holeScores: ALL numbers from the Score row left to right, EXCLUDING the final Ud total
+- holePars: ALL numbers from the Par row left to right, EXCLUDING the final Ud total
+- date: from "Game MM/DD/YYYY" convert to "YYYY-MM-DD"
+- holes: "For9" if holes 1-9, "Bag9" if 10-18
+- birdies: 0`;
 
     const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',

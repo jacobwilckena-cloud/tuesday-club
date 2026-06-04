@@ -2749,34 +2749,43 @@ function handleImageUpload(event) {
   
   Promise.all(files.map(function(file) { return compressImage(file); }))
   .then(function(base64Images) {
-    var prompt = 'Golf GameBook scorecard screenshot. Find the ONE player with the full hole grid (Par row + Score row visible). Ignore leaderboard-only rows.\n\nReturn JSON only, no other text:\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"birdies":0,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules: stableford=second number in "Score X/Y", grossScore=first. holeScores=Score row. holePars=Par row. date from "Game MM/DD/YYYY". birdies=0 always.';
+    // Process sequentially via Netlify to avoid CORS and parallel timeouts
+    var results = [];
+    var processNext = function(idx) {
+      if (idx >= base64Images.length) return Promise.resolve(results);
+      
+      // Update loading message
+      var loadingEl = document.getElementById('ocrLoadingSection');
+      if (loadingEl) {
+        var msgEl = loadingEl.querySelector('p, div');
+        if (msgEl) msgEl.textContent = 'Analyserer billede ' + (idx+1) + ' af ' + base64Images.length + '...';
+      }
 
-    // Call NVIDIA directly from browser — no Netlify timeout!
-    return Promise.all(base64Images.map(function(img) {
-      return fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      return fetch('/.netlify/functions/ocr', {
         method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + NVIDIA_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'meta/llama-3.2-11b-vision-instruct',
-          messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + img } },
-            { type: 'text', text: prompt }
-          ]}],
-          max_tokens: 250,
-          temperature: 0.1
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Images[idx] })
       })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-        var match = text.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error('Ingen scorecard data i svaret');
-        return JSON.parse(match[0]);
+      .then(function(r) { return r.text(); })
+      .then(function(text) {
+        try {
+          var data = JSON.parse(text);
+          if (data && data.players) results.push(data);
+        } catch(e) {
+          // Try to extract JSON from text
+          var m = text.match(/\{[\s\S]*\}/);
+          if (m) {
+            try { results.push(JSON.parse(m[0])); } catch(e2) {}
+          }
+        }
+        return processNext(idx + 1);
+      })
+      .catch(function() {
+        return processNext(idx + 1); // Continue even if one fails
       });
-    }));
+    };
+
+    return processNext(0);
   })
   .then(function(results) {
     var allPlayers = [];

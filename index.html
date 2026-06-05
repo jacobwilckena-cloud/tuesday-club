@@ -2624,7 +2624,16 @@ function openAddRoundModal() {
   updateRoundDate();
 
   document.getElementById('addRoundModal').classList.remove('hidden');
-  renderAddRoundModal();
+  // Reset OCR flow after modal is visible so DOM elements exist
+  ocrStep = 'idle';
+  ocrCurrentCard = null;
+  ocrQueue = [];
+  ['idle','scanning','review','queue'].forEach(function(s) {
+    var el = document.getElementById('ocrStep_' + s);
+    if (el) el.classList.toggle('hidden', s !== 'idle');
+  });
+  var eb = document.getElementById('ocrErrorBanner');
+  if (eb) eb.classList.add('hidden');
 }
 
 // ═══════════════════════════════════════════════════════

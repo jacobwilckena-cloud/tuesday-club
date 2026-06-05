@@ -2696,7 +2696,7 @@ function getGeminiModel() {
         return m.supportedGenerationMethods && m.supportedGenerationMethods.indexOf('generateContent') >= 0;
       }).map(function(m) { return m.name.replace(/^models\//, ''); });
       // Prefer a fast flash vision model, fall back to anything usable
-      var prefer = ['gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'];
+      var prefer = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-3-flash', 'gemini-2.5-flash-preview'];
       var chosen = null;
       for (var i = 0; i < prefer.length; i++) {
         if (models.indexOf(prefer[i]) >= 0) { chosen = prefer[i]; break; }
@@ -2738,7 +2738,13 @@ function ocrHandleUpload(event) {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data.error) throw new Error('Gemini: ' + data.error.message);
+      if (data.error) {
+        if (data.error.code === 429 || /quota|rate/i.test(data.error.message || '')) {
+          var retry = (data.error.message || '').match(/retry in ([\d.]+)/i);
+          throw new Error('Gemini-kvota opbrugt. ' + (retry ? 'Prøv igen om ' + Math.ceil(parseFloat(retry[1])) + ' sek.' : 'Vent lidt og prøv igen.'));
+        }
+        throw new Error('Gemini: ' + data.error.message);
+      }
       var text = (data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]&&data.candidates[0].content.parts[0].text) || '';
       if (!text) throw new Error('Tomt svar fra Gemini');
       var clean = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
@@ -3192,7 +3198,7 @@ function handleHandicapUpload(event) {
     .then(function(images) {
       var hcpPrompt = 'This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value. HCP can be a number (e.g. 11.6) or plus-handicap (e.g. +1.5 means better than scratch). Convert comma decimals to dots.\n\nReturn ONLY this JSON:\n{"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Martin Juul","handicap":20.3}]}';
       return Promise.all(images.map(function(img) {
-        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.0-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.5-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3444,7 +3450,7 @@ function generatePlayerSummary(playerId) {
 
   var summaryPrompt = 'Du er en golf-kommentator for Tuesday Club hos Mølleåens Golfklub. Skriv en kort, personlig sæsonanalyse på dansk (3-5 sætninger) for spilleren baseret på data nedenfor. Inkludér placering på leaderboardet, form, og sammenlign med de andre spillere. Vær positiv men ærlig. Brug golfterminologi. Tredje person.\n\n' + context;
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.0-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.5-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -778,44 +778,57 @@ body {
       <p>Indtast resultat fra Tuesday Club runde</p>
     </div>
     
-    <!-- OCR UPLOAD SECTION -->
-    <div id="ocrUploadSection" style="border: 1px dashed rgba(201,176,113,0.3); padding: 20px; margin-bottom: 24px; text-align: center; background: rgba(201,176,113,0.03);">
-      <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 6px;">📸 SCAN SCORECARD</div>
-      <div style="font-family: \'Crimson Text\', serif; font-style: italic; fontSize: 14px; color: #B8AE95; margin-bottom: 14px; line-height: 1.5;">
-        Upload screenshots fra Golf GameBook<br/>
-        Vi læser automatisk points, score og birdies
+    <!-- OCR FLOW: step = idle | scanning | review | queue -->
+    <div id="ocrFlowSection">
+
+      <!-- STEP: idle — upload first scorecard -->
+      <div id="ocrStep_idle" style="border: 1px dashed rgba(201,176,113,0.3); padding: 28px 20px; margin-bottom: 24px; text-align: center; background: rgba(201,176,113,0.03);">
+        <div style="font-family: \'Crimson Text\', serif; font-size: 22px; color: #C9B071; margin-bottom: 6px;">📸 Scan scorecard</div>
+        <div style="font-family: Inter, sans-serif; font-style: italic; font-size: 13px; color: #B8AE95; margin-bottom: 20px; line-height: 1.6;">
+          Upload ét scorecard ad gangen fra Golf GameBook
+        </div>
+        <label for="scorecardUploadNew" style="display: inline-block; padding: 12px 28px; border: 1px solid #C9B071; color: #C9B071; cursor: pointer; font-family: Inter, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;">
+          UPLOAD SCORECARD
+        </label>
+        <input type="file" id="scorecardUploadNew" accept="image/*" style="display:none" onchange="ocrHandleUpload(event)">
       </div>
-      <input type="file" id="scorecardUpload" accept="image/*" multiple style="display: none;" onchange="handleImageUpload(event)">
-      <label for="scorecardUpload" style="display: inline-block; padding: 10px 22px; border: 1px solid #C9B071; color: #C9B071; cursor: pointer; font-family: Inter, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;">
-        UPLOAD BILLEDER
-      </label>
-    </div>
-    
-    <div id="ocrLoadingSection" class="hidden" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; padding: 40px 24px; text-align: center; border: 1px solid rgba(201,176,113,0.2); background: rgba(26,23,19,0.98); border-radius: 8px; backdrop-filter: blur(10px);">
-      <div style="font-family: \'Crimson Text\', serif; font-style: italic; font-size: 20px; color: #C9B071; margin-bottom: 16px;">
-        🔄 Læser scorecards…
+
+      <!-- STEP: scanning -->
+      <div id="ocrStep_scanning" class="hidden" style="padding: 40px 20px; text-align: center; margin-bottom: 24px;">
+        <div style="font-family: \'Crimson Text\', serif; font-size: 20px; color: #C9B071; margin-bottom: 10px;">🔄 Læser scorecard…</div>
+        <div style="font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95; letter-spacing: 1px;">Typisk 5–15 sekunder</div>
       </div>
-      <div style="font-family: Inter, sans-serif; font-size: 11px; color: #B8AE95; letter-spacing: 1px;">
-        Behandler billeder — typisk 10-20 sekunder
+
+      <!-- STEP: review — validate one card -->
+      <div id="ocrStep_review" class="hidden" style="border: 1px solid rgba(201,176,113,0.3); padding: 20px; margin-bottom: 24px; background: rgba(201,176,113,0.05);">
+        <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 4px;">BEKRÆFT SCORECARD</div>
+        <div id="ocrReviewBody"></div>
+        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
+          <button type="button" onclick="ocrApproveCard()" class="btn-primary" style="flex:1;">✓ Godkend</button>
+          <label for="ocrNextCardInput" class="btn-secondary" style="flex:1;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;">📸 Næste scorecard</label>
+          <input type="file" id="ocrNextCardInput" accept="image/*" style="display:none" onchange="ocrHandleUpload(event)">
+        </div>
+        <button type="button" onclick="ocrCancelCard()" style="width:100%;margin-top:10px;padding:10px;background:none;border:1px solid rgba(201,176,113,0.2);color:#B8AE95;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;letter-spacing:1px;">ANNULLER DETTE SCORECARD</button>
       </div>
-    </div>
-    
-    <div id="ocrErrorSection" class="hidden" style="padding: 20px; background: rgba(255,0,0,0.1); border: 1px solid rgba(255,0,0,0.3); margin-bottom: 24px;">
-      <div style="color: #ff4444; font-family: Inter, sans-serif; font-size: 14px;" id="ocrErrorText"></div>
-      <button type="button" onclick="cancelOcr()" style="margin-top: 12px; padding: 8px 16px; background: none; border: 1px solid #ff4444; color: #ff4444; cursor: pointer;">Luk</button>
-    </div>
-    
-    <div id="ocrReviewSection" class="hidden" style="border: 1px solid rgba(201,176,113,0.3); padding: 24px; margin-bottom: 24px; background: rgba(201,176,113,0.05);">
-      <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 10px;">BEKRÆFT LÆSNING</div>
-      <div style="font-family: \'Crimson Text\', serif; font-style: italic; font-size: 13px; color: #B8AE95; margin-bottom: 16px;" id="ocrReviewTitle"></div>
-      <div id="ocrReviewPlayers"></div>
-      <div id="ocrAddingIndicator" class="hidden" style="text-align:center;padding:12px;font-family:Inter,sans-serif;font-size:12px;color:#B8AE95;">⏳ Analyserer scorecard...</div>
-      <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
-        <button type="button" onclick="applyOcrToForm()" class="btn-primary" style="flex: 1;">Brug Data</button>
-        <label for="addMoreScorecardInput" class="btn-secondary" style="flex:1;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;">➕ Tilføj scorecard</label>
-        <input type="file" id="addMoreScorecardInput" accept="image/*" style="display:none" onchange="handleAddMoreScorecard(event)">
-        <button type="button" onclick="cancelOcr()" class="btn-secondary" style="flex: 1; flex-basis: 100%;">Annuller</button>
+
+      <!-- STEP: queue — show approved cards, add more or save all -->
+      <div id="ocrStep_queue" class="hidden" style="border: 1px solid rgba(201,176,113,0.3); padding: 20px; margin-bottom: 24px; background: rgba(201,176,113,0.05);">
+        <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 12px;">KLAR TIL AT GEMME</div>
+        <div id="ocrQueueList"></div>
+        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
+          <label for="ocrAddCardInput" class="btn-secondary" style="flex:1;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;">📸 Tilføj scorecard</label>
+          <input type="file" id="ocrAddCardInput" accept="image/*" style="display:none" onchange="ocrHandleUpload(event)">
+          <button type="button" onclick="ocrSaveAll()" class="btn-primary" style="flex:1;">💾 Gem alle</button>
+        </div>
+        <button type="button" onclick="ocrResetAll()" style="width:100%;margin-top:10px;padding:10px;background:none;border:1px solid rgba(255,68,68,0.3);color:#ff8888;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;letter-spacing:1px;">NULSTIL ALT</button>
       </div>
+
+      <!-- Error banner -->
+      <div id="ocrErrorBanner" class="hidden" style="padding: 14px 16px; background: rgba(255,0,0,0.1); border: 1px solid rgba(255,0,0,0.3); margin-bottom: 16px; display:flex; align-items:center; gap:12px;">
+        <div style="color:#ff4444;font-family:Inter,sans-serif;font-size:13px;flex:1;" id="ocrErrorBannerText"></div>
+        <button type="button" onclick="document.getElementById('ocrErrorBanner').classList.add('hidden')" style="background:none;border:none;color:#ff4444;font-size:18px;cursor:pointer;padding:0;">✕</button>
+      </div>
+
     </div>
     
     <div id="multiplayerFormContainer" class="hidden"></div>
@@ -2614,225 +2627,48 @@ function openAddRoundModal() {
   renderAddRoundModal();
 }
 
-function renderAddRoundModal() {
-  // Toggle OCR sections based on state
-  var uploadSection = document.getElementById('ocrUploadSection');
-  var loadingSection = document.getElementById('ocrLoadingSection');
-  var errorSection = document.getElementById('ocrErrorSection');
-  var reviewSection = document.getElementById('ocrReviewSection');
-  
-  uploadSection.classList.toggle('hidden', ocrState !== 'idle');
-  loadingSection.classList.toggle('hidden', ocrState !== 'loading');
-  errorSection.classList.toggle('hidden', ocrState !== 'error');
-  reviewSection.classList.toggle('hidden', ocrState !== 'review');
-  
-  if (ocrState === 'error') {
-    document.getElementById('ocrErrorText').textContent = ocrError;
-  }
-  
-  if (ocrState === 'review' && ocrResult) {
-    var title = ocrResult.players.length + ' spiller' + (ocrResult.players.length !== 1 ? 'e' : '') + ' fundet · Tjek navne-match';
-    document.getElementById('ocrReviewTitle').textContent = title;
-    
-    var playersHTML = '';
-    ocrResult.players.forEach(function(ep) {
-      // Pre-calculate birdies from holeScores if available
-      var calcBirdies = 0;
-      if (ep.holeScores && ep.holeScores.length > 0 && ep.holePars && ep.holePars.length > 0) {
-        for (var bi = 0; bi < ep.holeScores.length; bi++) {
-          if (ep.holePars[bi] && ep.holeScores[bi] < ep.holePars[bi]) calcBirdies++;
-        }
-      } else {
-        calcBirdies = ep.birdies || 0;
-      }
-      // Store initial value so applyOcrToForm can read it
-      if (!window.ocrBirdieOverrides) window.ocrBirdieOverrides = {};
-      window.ocrBirdieOverrides[ep.name] = calcBirdies;
+// ═══════════════════════════════════════════════════════
+// NEW OCR FLOW — one card at a time
+// State: ocrStep (idle|scanning|review|queue)
+//        ocrCurrentCard — card being reviewed { ep, matchId, birdies }
+//        ocrQueue — approved cards []
+// ═══════════════════════════════════════════════════════
 
-      playersHTML += '<div style="padding: 10px 0; border-bottom: 1px solid rgba(201,176,113,0.2);">';
-      playersHTML += '<div style="display: grid; grid-template-columns: 1fr 180px; gap: 12px; align-items: center;">';
-      playersHTML += '<div>';
-      playersHTML += '<div style="font-family: \'Crimson Text\', serif; font-size: 17px; color: #EFE7D2;">' + ep.name + '</div>';
-      playersHTML += '<div style="font-family: Inter, sans-serif; font-size: 10px; color: #B8AE95; letter-spacing: 0.5px; margin-top: 2px;">';
-      playersHTML += ep.stableford + ' pts' + (ep.grossScore > 0 ? ' · ' + ep.grossScore + ' slag' : '');
-      playersHTML += '</div>';
-      // Editable birdies field
-      playersHTML += '<div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">';
-      playersHTML += '<span style="font-family: Inter, sans-serif; font-size: 10px; color: #C9B071; letter-spacing: 1px; text-transform: uppercase;">🐦 Birdies</span>';
-      playersHTML += '<input type="number" min="0" max="9" value="' + calcBirdies + '" ';
-      playersHTML += 'onchange="if(!window.ocrBirdieOverrides)window.ocrBirdieOverrides={};window.ocrBirdieOverrides[\'' + ep.name.replace(/'/g, "\\'") + '\']=parseInt(this.value)||0" ';
-      playersHTML += 'style="width: 52px; padding: 4px 8px; background: #0A0F0C; border: 1px solid rgba(201,176,113,0.4); color: #EFE7D2; font-size: 15px; text-align: center;">';
-      playersHTML += '</div>';
-      playersHTML += '</div>';
+var ocrStep = 'idle';
+var ocrCurrentCard = null;  // { ep, matchId, birdies }
+var ocrQueue = [];          // approved cards
 
-      // Visual scorecard if holeScores available
-      if (ep.holeScores && ep.holeScores.length > 0 && ep.holePars && ep.holePars.length > 0) {
-        playersHTML += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:10px;margin-bottom:4px;">';
-        playersHTML += '<table style="border-collapse:collapse;font-family:Inter,sans-serif;font-size:11px;width:100%;">';
-        // Hole numbers
-        playersHTML += '<tr><td style="padding:2px 4px;color:#B8AE95;font-size:9px;">Hul</td>';
-        for (var hi = 0; hi < ep.holeScores.length; hi++) playersHTML += '<td style="padding:2px 3px;text-align:center;color:#B8AE95;font-size:9px;">' + (hi+1) + '</td>';
-        playersHTML += '</tr>';
-        // Par row
-        playersHTML += '<tr><td style="padding:2px 4px;color:#B8AE95;font-size:9px;">Par</td>';
-        for (var hi = 0; hi < ep.holePars.length; hi++) playersHTML += '<td style="padding:2px 3px;text-align:center;color:#B8AE95;">' + ep.holePars[hi] + '</td>';
-        playersHTML += '</tr>';
-        // Score row with golf notation
-        playersHTML += '<tr><td style="padding:3px 4px;color:#B8AE95;font-size:9px;">Score</td>';
-        for (var hi = 0; hi < ep.holeScores.length; hi++) {
-          var s = ep.holeScores[hi];
-          var p = ep.holePars[hi];
-          var d = s - p;
-          var ns = 'display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;font-size:11px;font-weight:600;';
-          if (d <= -2)      ns += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
-          else if (d === -1) ns += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';
-          else if (d === 0)  ns += 'color:#EFE7D2;';
-          else if (d === 1)  ns += 'border:2px solid #B8AE95;color:#B8AE95;';
-          else if (d === 2)  ns += 'border:2px solid #ef8c34;outline:2px solid #ef8c34;outline-offset:2px;color:#ef8c34;';
-          else               ns += 'border:2px solid #ef4444;outline:2px solid #ef4444;outline-offset:2px;color:#ef4444;';
-          playersHTML += '<td style="padding:2px 2px;text-align:center;"><span style="' + ns + '">' + s + '</span></td>';
-        }
-        playersHTML += '</tr>';
-        playersHTML += '</table></div>';
-      }
-
-      playersHTML += '<select onchange="ocrMatches[\'' + ep.name + '\'] = this.value ? parseInt(this.value) : undefined" style="background: #1F1C17; color: #EFE7D2; border: 1px solid rgba(201,176,113,0.3); padding: 10px; font-size: 14px; width: 100%;">';
-      playersHTML += '<option value="">— Spring over —</option>';
-      players.forEach(function(p) {
-        var selected = ocrMatches[ep.name] === p.id ? ' selected' : '';
-        playersHTML += '<option value="' + p.id + '"' + selected + '>' + p.name + '</option>';
-      });
-      playersHTML += '</select>';
-      playersHTML += '</div>';
-      playersHTML += '</div>';
-    });
-    document.getElementById('ocrReviewPlayers').innerHTML = playersHTML;
-  }
-}
-
-function closeAddRoundModal() {
-  document.getElementById('addRoundModal').classList.add('hidden');
-  document.getElementById('addRoundError').classList.add('hidden');
-  document.getElementById('addRoundSuccess').classList.add('hidden');
-  ocrState = 'idle';
-  ocrError = '';
-  ocrResult = null;
-  ocrMatches = {};
-}
-
-function handleAddRound(event) {
-  event.preventDefault();
-  
-  // Build ISO date from dropdowns
-  updateRoundDate();
-  
-  var errorDiv = document.getElementById('addRoundError');
-  var successDiv = document.getElementById('addRoundSuccess');
-  errorDiv.classList.add('hidden');
-  successDiv.classList.add('hidden');
-
-  var roundData = {
-    date: document.getElementById('roundDate').value,
-    course: document.getElementById('roundCourse').value,
-    holes: document.getElementById('roundHoles').value,
-    participants: [],
-    scores: {}
-  };
-  
-  // Check if we have multiplayer data from OCR
-  if (window.pendingMultiplayerRound && window.pendingMultiplayerRound.participants.length > 0) {
-    roundData.participants = window.pendingMultiplayerRound.participants;
-    roundData.scores = window.pendingMultiplayerRound.scores;
-  } else {
-    // Single player mode
-    var playerId = parseInt(document.getElementById('roundPlayer').value);
-    var stableford = parseInt(document.getElementById('roundStableford').value);
-    var gross = parseInt(document.getElementById('roundGross').value) || 0;
-    var birdies = parseInt(document.getElementById('roundBirdies').value) || 0;
-    
-    roundData.participants = [playerId];
-    roundData.scores[playerId] = { stableford: stableford, grossScore: gross, birdies: birdies };
-  }
-
-  var submitBtn = document.querySelector('#addRoundForm button[type="submit"]');
-  if (submitBtn) { submitBtn.textContent = 'Gemmer...'; submitBtn.disabled = true; }
-
-  saveRound(roundData)
-    .then(function(result) {
-      successDiv.textContent = '✅ Runde gemt!';
-      successDiv.classList.remove('hidden');
-      window.pendingMultiplayerRound = null;
-      renderMultiplayerForm();
-      return loadRounds();
-    })
-    .then(function() {
-      renderContent();
-      setTimeout(closeAddRoundModal, 2000);
-    })
-    .catch(function(error) {
-      errorDiv.textContent = '❌ Fejl: ' + error.message;
-      errorDiv.classList.remove('hidden');
-      errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    })
-    .finally(function() {
-      if (submitBtn) { submitBtn.textContent = 'Gem Runde'; submitBtn.disabled = false; }
-    });
-}
-
-// ========== OCR / IMAGE UPLOAD ==========
-function compressImage(file) {
-  return new Promise(function(resolve, reject) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var img = new Image();
-      img.onload = function() {
-        var canvas = document.createElement('canvas');
-        var maxW = 1200;
-        var scale = Math.min(1, maxW / img.width);
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        var dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-        resolve(dataUrl.split(',')[1]);
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+function ocrShowStep(step) {
+  ['idle','scanning','review','queue'].forEach(function(s) {
+    var el = document.getElementById('ocrStep_' + s);
+    if (el) el.classList.toggle('hidden', s !== step);
   });
+  ocrStep = step;
 }
 
-function discoverModel() {
-  return fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + GEMINI_API_KEY)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.error) throw new Error('Nøgle fejl: ' + data.error.message);
-      var models = (data.models || []);
-      var visionModel = models.find(function(m) {
-        return m.supportedGenerationMethods &&
-               m.supportedGenerationMethods.indexOf('generateContent') >= 0 &&
-               (m.name.indexOf('flash') >= 0 || m.name.indexOf('pro') >= 0);
-      });
-      if (!visionModel) throw new Error('Ingen Gemini vision-model tilgængelig. Tilgængelige: ' + models.map(function(m){return m.name;}).join(', '));
-      return visionModel.name.replace('models/', '');
-    });
+function ocrShowError(msg) {
+  var banner = document.getElementById('ocrErrorBanner');
+  var text   = document.getElementById('ocrErrorBannerText');
+  if (banner && text) { text.textContent = msg; banner.classList.remove('hidden'); }
 }
 
-function handleAddMoreScorecard(event) {
+function ocrHandleUpload(event) {
   var file = event.target.files && event.target.files[0];
-  if (!file) return;
   event.target.value = '';
+  if (!file) return;
 
-  var indicator = document.getElementById('ocrAddingIndicator');
-  if (indicator) indicator.classList.remove('hidden');
+  if (!GEMINI_API_KEY) {
+    ocrShowError('Ingen Gemini API-nøgle. Gå til ⚙️ Admin → Handicap → indsæt din nøgle først.');
+    return;
+  }
+
+  ocrShowStep('scanning');
+  document.getElementById('ocrErrorBanner').classList.add('hidden');
 
   compressImage(file)
     .then(function(img) {
       return discoverModel().then(function(modelId) {
-        var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: second number in "Score X/Y"\n- grossScore: first number in "Score X/Y"\n- holeScores: Score row numbers left to right, EXCLUDING Ud total\n- holePars: Par row numbers left to right, EXCLUDING Ud total\n- date: "Game MM/DD/YYYY" → "YYYY-MM-DD"\n- holes: "For9" 1-9, "Bag9" 10-18, "18" full';
-
+        var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: the second number in "Score X/Y" at the bottom\n- grossScore: the first number in "Score X/Y"\n- holeScores: every number in the Score row, left to right, EXCLUDING the Ud total column\n- holePars: every number in the Par row, left to right, EXCLUDING the Ud total column\n- date: from "Game MM/DD/YYYY" converted to YYYY-MM-DD\n- holes: "For9" if holes 1-9, "Bag9" if holes 10-18, "18" if 18 holes';
         return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelId + ':generateContent?key=' + GEMINI_API_KEY, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2843,244 +2679,229 @@ function handleAddMoreScorecard(event) {
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-          if (data.error) throw new Error('Gemini fejl: ' + data.error.message);
-          var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
-          var clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+          if (data.error) throw new Error('Gemini: ' + data.error.message);
+          var text = (data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]&&data.candidates[0].content.parts[0].text) || '';
+          if (!text) throw new Error('Tomt svar fra Gemini');
+          var clean = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
           var m = clean.match(/\{[\s\S]*\}/);
-          if (!m) throw new Error('Ingen data i svar');
+          if (!m) throw new Error('Intet JSON i svar');
           return JSON.parse(m[0]);
         });
       });
     })
     .then(function(result) {
-      if (indicator) indicator.classList.add('hidden');
-      if (!result || !result.players || !result.players.length) {
-        alert('Ingen spiller fundet i dette scorecard');
-        return;
+      var ep = result.players && result.players[0];
+      if (!ep) throw new Error('Ingen spiller fundet i billedet');
+
+      // Pre-fill date if first card
+      if (result.date && result.date.match(/^\d{4}-\d{2}-\d{2}$/) && ocrQueue.length === 0) {
+        var p = result.date.split('-');
+        document.getElementById('roundYear').value = p[0];
+        document.getElementById('roundMonth').value = p[1];
+        document.getElementById('roundDay').value = String(parseInt(p[2]));
+        updateRoundDate();
       }
-      // Merge into existing ocrResult
-      result.players.forEach(function(ep) {
-        var existing = ocrResult.players.find(function(p) { return p.name.toLowerCase() === ep.name.toLowerCase(); });
-        if (!existing) {
-          ocrResult.players.push(ep);
-          // Auto-match
-          var epName = ep.name.toLowerCase();
-          var bestMatch = null, bestScore = 0;
-          players.forEach(function(p) {
-            var pName = p.name.toLowerCase();
-            var score = 0;
-            if (pName === epName) score += 20;
-            else if (pName.split(' ')[0] === epName.split(' ')[0]) score += 10;
-            if (score > bestScore) { bestScore = score; bestMatch = p; }
-          });
-          if (bestMatch && bestScore >= 10) ocrMatches[ep.name] = bestMatch.id;
-        }
-      });
-      renderAddRoundModal();
-    })
-    .catch(function(err) {
-      if (indicator) indicator.classList.add('hidden');
-      alert('Fejl: ' + err.message);
-    });
-}
+      if (result.holes) document.getElementById('roundHoles').value = result.holes;
 
-function handleImageUpload(event) {
-  var files = Array.from(event.target.files || []);
-  if (files.length === 0) return;
-  
-  if (!GEMINI_API_KEY) {
-    ocrState = 'error';
-    ocrError = 'Ingen Gemini API-nøgle. Gå til ⚙️ Admin → Handicap → indsæt din nøgle først.';
-    renderAddRoundModal();
-    return;
-  }
-  
-  ocrState = 'loading';
-  ocrError = '';
-  renderAddRoundModal();
-  
-  Promise.all(files.map(function(file) { return compressImage(file); }))
-  .then(function(base64Images) {
-    return discoverModel().then(function(modelId) {
-      var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: the second number in "Score X/Y" at the bottom\n- grossScore: the first number in "Score X/Y"\n- holeScores: every number in the Score row, left to right, EXCLUDING the Ud total column\n- holePars: every number in the Par row, left to right, EXCLUDING the Ud total column\n- date: from "Game MM/DD/YYYY" converted to YYYY-MM-DD\n- holes: "For9" if holes 1-9, "Bag9" if holes 10-18, "18" if 18 holes';
-
-      return Promise.all(base64Images.map(function(img) {
-        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelId + ':generateContent?key=' + GEMINI_API_KEY, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: prompt },
-                { inline_data: { mime_type: 'image/jpeg', data: img } }
-              ]
-            }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
-          })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.error) throw new Error('Gemini fejl: ' + data.error.message + ' (kode: ' + data.error.code + ')');
-          var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
-          if (!text) throw new Error('Gemini returnerede tomt svar (model: ' + modelId + ')');
-          // Strip markdown fences first, then extract JSON
-          var clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-          var m = clean.match(/\{[\s\S]*\}/);
-          if (!m) throw new Error('Intet JSON i Gemini-svar: ' + text.substring(0, 100));
-          return JSON.parse(m[0]);
-        })
-        .catch(function(err) {
-          console.error('Gemini OCR error:', err.message);
-          throw err;
-        });
-      }));
-    });
-  })
-  .then(function(results) {
-    var allPlayers = [];
-    var detectedCourse = null;
-    var detectedHoles = null;
-    var detectedDate = null;
-    
-    results.forEach(function(res) {
-      if (res.course && !detectedCourse) detectedCourse = res.course;
-      if (res.holes && !detectedHoles) detectedHoles = res.holes;
-      if (res.date && !detectedDate) detectedDate = res.date;
-      (res.players || []).forEach(function(ep) {
-        var existing = allPlayers.find(function(p) { return p.name.toLowerCase() === ep.name.toLowerCase(); });
-        if (!existing) {
-          allPlayers.push(ep);
-        } else if ((ep.stableford || 0) > (existing.stableford || 0)) {
-          Object.assign(existing, ep);
-        }
-      });
-    });
-    
-    if (allPlayers.length === 0) throw new Error('Ingen spillere fundet i billederne');
-    
-    var matches = {};
-    allPlayers.forEach(function(ep) {
+      // Auto-match player name
       var epName = ep.name.trim().toLowerCase().replace(/\.\.\.$/, '').trim();
       var epParts = epName.split(/\s+/);
-      var epFirst = epParts[0];
-      var epSecond = epParts[1] || '';
-
-      var bestMatch = null;
-      var bestScore = 0;
-
+      var bestMatch = null, bestScore = 0;
       players.forEach(function(p) {
         var pName = p.name.trim().toLowerCase();
         var pParts = pName.split(/\s+/);
-        var pFirst = pParts[0];
-        var pSecond = pParts[1] || '';
-        var score = 0;
-
-        // Exact full name match (highest priority)
-        if (pName === epName) score += 20;
-
-        // First name match (most important)
-        if (pFirst === epFirst) score += 10;
-
-        // Second name starts with same letters (handles truncation like "Kretschmar P..." → "Pedersen")
-        if (epSecond && pSecond && pSecond.startsWith(epSecond)) score += 5;
-        if (epSecond && pSecond && epSecond.startsWith(pSecond)) score += 5;
-
-        // Full name contains match
-        if (pName.includes(epFirst) && epSecond && pName.includes(epSecond)) score += 8;
-
-        // OCR name is contained in player name (handles truncation)
-        if (pName.startsWith(epName)) score += 6;
-
-        // Check all OCR name parts appear in player name
-        var allPartsMatch = epParts.every(function(part) {
-          return part.length > 2 && pName.includes(part);
-        });
-        if (allPartsMatch && epParts.length >= 2) score += 7;
-
-        if (score > bestScore && score >= 10) {
-          bestScore = score;
-          bestMatch = p;
-        }
+        var sc = 0;
+        if (pName === epName) sc += 20;
+        if (pParts[0] === epParts[0]) sc += 10;
+        if (epParts[1] && pParts[1] && pParts[1].startsWith(epParts[1])) sc += 5;
+        if (epParts.length >= 2 && epParts.every(function(pt) { return pt.length > 2 && pName.includes(pt); })) sc += 7;
+        if (sc > bestScore && sc >= 10) { bestScore = sc; bestMatch = p; }
       });
 
-      if (bestMatch) matches[ep.name] = bestMatch.id;
+      // Calculate birdies from holeScores
+      var calcBirdies = 0;
+      if (ep.holeScores && ep.holePars) {
+        for (var bi = 0; bi < ep.holeScores.length; bi++) {
+          if (ep.holePars[bi] && ep.holeScores[bi] < ep.holePars[bi]) calcBirdies++;
+        }
+      } else { calcBirdies = ep.birdies || 0; }
+
+      ocrCurrentCard = { ep: ep, matchId: bestMatch ? bestMatch.id : null, birdies: calcBirdies };
+      ocrRenderReview();
+      ocrShowStep('review');
+    })
+    .catch(function(err) {
+      ocrShowError(err.message || 'Noget gik galt');
+      // Go back to whichever step makes sense
+      ocrShowStep(ocrQueue.length > 0 ? 'queue' : 'idle');
     });
-    
-    ocrResult = { players: allPlayers, course: detectedCourse, holes: detectedHoles };
-    ocrMatches = matches;
-    ocrState = 'review';
-    
-    if (detectedHoles) document.getElementById('roundHoles').value = detectedHoles;
-    if (detectedCourse) document.getElementById('roundCourse').value = detectedCourse;
-    
-    // Pre-fill date from scorecard
-    if (detectedDate && detectedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      var parts = detectedDate.split('-');
-      document.getElementById('roundYear').value = parts[0];
-      document.getElementById('roundMonth').value = parts[1];
-      document.getElementById('roundDay').value = String(parseInt(parts[2]));
-      updateRoundDate();
-    }
-    
-    renderAddRoundModal();
-  })
-  .catch(function(err) {
-    ocrError = err.message || 'Noget gik galt';
-    ocrState = 'error';
-    renderAddRoundModal();
-  });
-  
-  event.target.value = '';
 }
 
-function applyOcrToForm() {
-  if (!ocrResult || !ocrResult.players || ocrResult.players.length === 0) return;
-  
-  // Build participants array and scores object for ALL matched players
+function ocrRenderReview() {
+  var card = ocrCurrentCard;
+  if (!card) return;
+  var ep = card.ep;
+  var html = '';
+
+  // Player name match selector
+  html += '<div style="margin-bottom:14px;">';
+  html += '<div style="font-family:\'Crimson Text\',serif;font-size:19px;color:#EFE7D2;margin-bottom:4px;">' + ep.name + '</div>';
+  html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:10px;">' + ep.stableford + ' pts' + (ep.grossScore > 0 ? ' · ' + ep.grossScore + ' slag' : '') + '</div>';
+  html += '<div style="font-family:Inter,sans-serif;font-size:9px;color:#C9B071;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">MATCH TIL SPILLER</div>';
+  html += '<select id="ocrReviewMatchSelect" style="width:100%;background:#1F1C17;color:#EFE7D2;border:1px solid rgba(201,176,113,0.3);padding:10px;font-size:14px;">';
+  html += '<option value="">— Vælg spiller —</option>';
+  players.forEach(function(p) {
+    html += '<option value="' + p.id + '"' + (card.matchId === p.id ? ' selected' : '') + '>' + p.name + '</option>';
+  });
+  html += '</select>';
+  html += '</div>';
+
+  // Birdies editor
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">';
+  html += '<span style="font-family:Inter,sans-serif;font-size:10px;color:#C9B071;letter-spacing:1px;text-transform:uppercase;">🐦 Birdies</span>';
+  html += '<input type="number" id="ocrReviewBirdies" min="0" max="9" value="' + card.birdies + '" style="width:56px;padding:5px 8px;background:#0A0F0C;border:1px solid rgba(201,176,113,0.4);color:#EFE7D2;font-size:16px;text-align:center;">';
+  html += '</div>';
+
+  // Scorecard grid
+  if (ep.holeScores && ep.holeScores.length > 0 && ep.holePars && ep.holePars.length > 0) {
+    html += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:4px;">';
+    html += '<table style="border-collapse:collapse;font-family:Inter,sans-serif;font-size:12px;width:100%;">';
+    // Hole numbers
+    html += '<tr><td style="padding:2px 5px;color:#B8AE95;font-size:9px;white-space:nowrap;">Hul</td>';
+    for (var h = 0; h < ep.holeScores.length; h++) html += '<td style="padding:2px 3px;text-align:center;color:#B8AE95;font-size:10px;">' + (h+1) + '</td>';
+    html += '</tr>';
+    // Par
+    html += '<tr><td style="padding:2px 5px;color:#B8AE95;font-size:9px;">Par</td>';
+    for (var h = 0; h < ep.holePars.length; h++) html += '<td style="padding:2px 3px;text-align:center;color:#B8AE95;">' + ep.holePars[h] + '</td>';
+    html += '</tr>';
+    // Score with notation
+    html += '<tr><td style="padding:3px 5px;color:#B8AE95;font-size:9px;">Score</td>';
+    for (var h = 0; h < ep.holeScores.length; h++) {
+      var s = ep.holeScores[h], p = ep.holePars[h], d = s - p;
+      var ns = 'display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:12px;font-weight:600;';
+      if      (d <= -2) ns += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
+      else if (d === -1) ns += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';
+      else if (d === 0)  ns += 'color:#EFE7D2;';
+      else if (d === 1)  ns += 'border:2px solid #B8AE95;color:#B8AE95;';
+      else if (d === 2)  ns += 'border:2px solid #ef8c34;outline:2px solid #ef8c34;outline-offset:2px;color:#ef8c34;';
+      else               ns += 'border:2px solid #ef4444;outline:2px solid #ef4444;outline-offset:2px;color:#ef4444;';
+      html += '<td style="padding:2px 2px;text-align:center;"><span style="' + ns + '">' + s + '</span></td>';
+    }
+    html += '</tr>';
+    // Points row if available
+    if (ep.holePoints && ep.holePoints.length > 0) {
+      html += '<tr><td style="padding:2px 5px;color:#B8AE95;font-size:9px;">Pts</td>';
+      for (var h = 0; h < ep.holePoints.length; h++) html += '<td style="padding:2px 3px;text-align:center;color:#C9B071;font-size:10px;">' + ep.holePoints[h] + '</td>';
+      html += '</tr>';
+    }
+    html += '</table></div>';
+  } else {
+    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;font-style:italic;padding:8px 0;">Ingen huldata — kun totaler gemt</div>';
+  }
+
+  document.getElementById('ocrReviewBody').innerHTML = html;
+}
+
+function ocrApproveCard() {
+  var card = ocrCurrentCard;
+  if (!card) return;
+  // Read current values from UI
+  var sel = document.getElementById('ocrReviewMatchSelect');
+  var birdiesEl = document.getElementById('ocrReviewBirdies');
+  card.matchId = sel ? (parseInt(sel.value) || null) : card.matchId;
+  card.birdies = birdiesEl ? (parseInt(birdiesEl.value) || 0) : card.birdies;
+
+  if (!card.matchId) { ocrShowError('Vælg en spiller inden godkendelse'); return; }
+
+  // Check not already in queue
+  var existing = ocrQueue.findIndex(function(c) { return c.matchId === card.matchId; });
+  if (existing >= 0) ocrQueue[existing] = card; // overwrite if same player
+  else ocrQueue.push(card);
+
+  ocrCurrentCard = null;
+  ocrRenderQueue();
+  ocrShowStep('queue');
+}
+
+function ocrCancelCard() {
+  ocrCurrentCard = null;
+  ocrShowStep(ocrQueue.length > 0 ? 'queue' : 'idle');
+}
+
+function ocrRemoveFromQueue(idx) {
+  ocrQueue.splice(idx, 1);
+  ocrRenderQueue();
+  if (ocrQueue.length === 0) ocrShowStep('idle');
+}
+
+function ocrRenderQueue() {
+  var el = document.getElementById('ocrQueueList');
+  if (!el) return;
+  var html = '';
+  ocrQueue.forEach(function(card, idx) {
+    var player = players.find(function(p) { return p.id === card.matchId; });
+    var ep = card.ep;
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(201,176,113,0.15);">';
+    html += '<div>';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:17px;color:#EFE7D2;">' + (player ? player.name : ep.name) + '</div>';
+    html += '<div style="font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;margin-top:2px;">' + ep.stableford + ' pts';
+    if (ep.grossScore > 0) html += ' · ' + ep.grossScore + ' slag';
+    if (card.birdies > 0) html += ' · 🐦 ' + card.birdies;
+    html += '</div>';
+    // Mini scorecard
+    if (ep.holeScores && ep.holeScores.length > 0 && ep.holePars) {
+      html += '<div style="display:flex;gap:3px;margin-top:6px;flex-wrap:wrap;">';
+      for (var h = 0; h < ep.holeScores.length; h++) {
+        var s = ep.holeScores[h], p = ep.holePars[h], d = s - p;
+        var ns = 'display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:10px;font-weight:600;';
+        if      (d <= -2) ns += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
+        else if (d === -1) ns += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';
+        else if (d === 0)  ns += 'color:#EFE7D2;';
+        else if (d === 1)  ns += 'border:2px solid #B8AE95;color:#B8AE95;';
+        else if (d === 2)  ns += 'border:2px solid #ef8c34;outline:2px solid #ef8c34;outline-offset:2px;color:#ef8c34;';
+        else               ns += 'border:2px solid #ef4444;outline:2px solid #ef4444;outline-offset:2px;color:#ef4444;';
+        html += '<span style="' + ns + '">' + s + '</span>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '<button type="button" onclick="ocrRemoveFromQueue(' + idx + ')" style="background:none;border:none;color:#ff6666;font-size:20px;cursor:pointer;padding:4px 8px;flex-shrink:0;">✕</button>';
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function ocrSaveAll() {
+  if (ocrQueue.length === 0) return;
   var participants = [];
   var scores = {};
-  
-  ocrResult.players.forEach(function(ep) {
-    var playerId = ocrMatches[ep.name];
-    if (playerId) {
-      participants.push(playerId);
-      
-      // Use manually overridden birdies from review UI (user can correct OCR)
-      var holeScores = ep.holeScores || [];
-      var holePars = ep.holePars || [];
-      var birdies = (window.ocrBirdieOverrides && window.ocrBirdieOverrides[ep.name] !== undefined)
-        ? window.ocrBirdieOverrides[ep.name]
-        : (ep.birdies || 0);
-      
-      scores[playerId] = {
-        stableford: ep.stableford || 0,
-        grossScore: ep.grossScore || 0,
-        birdies: birdies,
-        holeScores: holeScores,
-        holePars: holePars
-      };
-    }
+  ocrQueue.forEach(function(card) {
+    participants.push(card.matchId);
+    scores[card.matchId] = {
+      stableford: card.ep.stableford || 0,
+      grossScore: card.ep.grossScore || 0,
+      birdies: card.birdies,
+      holeScores: card.ep.holeScores || [],
+      holePars: card.ep.holePars || []
+    };
   });
-  
-  // Store multi-player round data
-  window.pendingMultiplayerRound = {
-    participants: participants,
-    scores: scores
-  };
-  
-  ocrState = 'idle';
-  ocrResult = null;
-  ocrMatches = {};
-  renderAddRoundModal();
+  window.pendingMultiplayerRound = { participants: participants, scores: scores };
+  ocrResetAll();
   renderMultiplayerForm();
 }
 
-function cancelOcr() {
-  ocrState = 'idle';
-  ocrResult = null;
-  ocrMatches = {};
-  renderAddRoundModal();
+function ocrResetAll() {
+  ocrStep = 'idle';
+  ocrCurrentCard = null;
+  ocrQueue = [];
+  ocrShowStep('idle');
+  document.getElementById('ocrErrorBanner').classList.add('hidden');
 }
+
+// ── Legacy stubs (keep old call sites from crashing) ──────────────────────
+function renderAddRoundModal() {}
+function cancelOcr() { ocrResetAll(); }
+
 
 function renderMultiplayerForm() {
   var container = document.getElementById('multiplayerFormContainer');

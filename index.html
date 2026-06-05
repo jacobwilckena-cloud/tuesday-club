@@ -2783,19 +2783,18 @@ function handleImageUpload(event) {
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        if (data.error) throw new Error('Gemini: ' + data.error.message);
+        if (data.error) throw new Error('Gemini fejl: ' + data.error.message + ' (kode: ' + data.error.code + ')');
         var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
+        if (!text) throw new Error('Gemini returnerede tomt svar');
         var m = text.match(/\{[\s\S]*\}/);
-        if (!m) throw new Error('Ingen data i Gemini-svar');
+        if (!m) throw new Error('Intet JSON i Gemini-svar: ' + text.substring(0, 100));
         return JSON.parse(m[0]);
       })
       .catch(function(err) {
-        console.error('Gemini OCR error:', err);
-        return null; // Continue with other images
+        console.error('Gemini OCR error:', err.message);
+        throw err; // Propagate so we see the real error
       });
-    })).then(function(arr) {
-      return arr.filter(function(x) { return x !== null; });
-    });
+    }));
   })
   .then(function(results) {
     var allPlayers = [];

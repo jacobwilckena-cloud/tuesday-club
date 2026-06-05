@@ -2768,7 +2768,7 @@ function handleImageUpload(event) {
 
     // Call Gemini 2.0 Flash directly from browser — fast, CORS-friendly, accurate
     return Promise.all(base64Images.map(function(img) {
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_API_KEY, {
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_API_KEY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3178,7 +3178,7 @@ function handleHandicapUpload(event) {
     .then(function(images) {
       var hcpPrompt = 'This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value. HCP can be a number (e.g. 11.6) or plus-handicap (e.g. +1.5 means better than scratch). Convert comma decimals to dots.\n\nReturn ONLY this JSON:\n{"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Martin Juul","handicap":20.3}]}';
       return Promise.all(images.map(function(img) {
-        return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_API_KEY, {
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_API_KEY, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3430,7 +3430,7 @@ function generatePlayerSummary(playerId) {
 
   var summaryPrompt = 'Du er en golf-kommentator for Tuesday Club hos Mølleåens Golfklub. Skriv en kort, personlig sæsonanalyse på dansk (3-5 sætninger) for spilleren baseret på data nedenfor. Inkludér placering på leaderboardet, form, og sammenlign med de andre spillere. Vær positiv men ærlig. Brug golfterminologi. Tredje person.\n\n' + context;
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_API_KEY, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_API_KEY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

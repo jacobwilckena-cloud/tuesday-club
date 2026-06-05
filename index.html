@@ -809,9 +809,12 @@ body {
       <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 10px;">BEKRÆFT LÆSNING</div>
       <div style="font-family: \'Crimson Text\', serif; font-style: italic; font-size: 13px; color: #B8AE95; margin-bottom: 16px;" id="ocrReviewTitle"></div>
       <div id="ocrReviewPlayers"></div>
-      <div style="display: flex; gap: 12px; margin-top: 20px;">
+      <div id="ocrAddingIndicator" class="hidden" style="text-align:center;padding:12px;font-family:Inter,sans-serif;font-size:12px;color:#B8AE95;">⏳ Analyserer scorecard...</div>
+      <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
         <button type="button" onclick="applyOcrToForm()" class="btn-primary" style="flex: 1;">Brug Data</button>
-        <button type="button" onclick="cancelOcr()" class="btn-secondary" style="flex: 1;">Annuller</button>
+        <input type="file" id="addMoreScorecardInput" accept="image/*" style="display:none" onchange="handleAddMoreScorecard(event)">
+        <button type="button" onclick="document.getElementById(\'addMoreScorecardInput\').click()" class="btn-secondary" style="flex: 1;">➕ Tilføj scorecard</button>
+        <button type="button" onclick="cancelOcr()" class="btn-secondary" style="flex: 1; flex-basis: 100%;">Annuller</button>
       </div>
     </div>
     
@@ -2747,6 +2750,86 @@ function compressImage(file) {
   });
 }
 
+function discoverModel() {
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + GEMINI_API_KEY)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) throw new Error('Nøgle fejl: ' + data.error.message);
+      var models = (data.models || []);
+      var visionModel = models.find(function(m) {
+        return m.supportedGenerationMethods &&
+               m.supportedGenerationMethods.indexOf('generateContent') >= 0 &&
+               (m.name.indexOf('flash') >= 0 || m.name.indexOf('pro') >= 0);
+      });
+      if (!visionModel) throw new Error('Ingen Gemini vision-model tilgængelig. Tilgængelige: ' + models.map(function(m){return m.name;}).join(', '));
+      return visionModel.name.replace('models/', '');
+    });
+}
+
+function handleAddMoreScorecard(event) {
+  var file = event.target.files && event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  var indicator = document.getElementById('ocrAddingIndicator');
+  if (indicator) indicator.classList.remove('hidden');
+
+  compressImage(file)
+    .then(function(img) {
+      return discoverModel().then(function(modelId) {
+        var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: second number in "Score X/Y"\n- grossScore: first number in "Score X/Y"\n- holeScores: Score row numbers left to right, EXCLUDING Ud total\n- holePars: Par row numbers left to right, EXCLUDING Ud total\n- date: "Game MM/DD/YYYY" → "YYYY-MM-DD"\n- holes: "For9" 1-9, "Bag9" 10-18, "18" full';
+
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelId + ':generateContent?key=' + GEMINI_API_KEY, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: img } }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) throw new Error('Gemini fejl: ' + data.error.message);
+          var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
+          var clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+          var m = clean.match(/\{[\s\S]*\}/);
+          if (!m) throw new Error('Ingen data i svar');
+          return JSON.parse(m[0]);
+        });
+      });
+    })
+    .then(function(result) {
+      if (indicator) indicator.classList.add('hidden');
+      if (!result || !result.players || !result.players.length) {
+        alert('Ingen spiller fundet i dette scorecard');
+        return;
+      }
+      // Merge into existing ocrResult
+      result.players.forEach(function(ep) {
+        var existing = ocrResult.players.find(function(p) { return p.name.toLowerCase() === ep.name.toLowerCase(); });
+        if (!existing) {
+          ocrResult.players.push(ep);
+          // Auto-match
+          var epName = ep.name.toLowerCase();
+          var bestMatch = null, bestScore = 0;
+          players.forEach(function(p) {
+            var pName = p.name.toLowerCase();
+            var score = 0;
+            if (pName === epName) score += 20;
+            else if (pName.split(' ')[0] === epName.split(' ')[0]) score += 10;
+            if (score > bestScore) { bestScore = score; bestMatch = p; }
+          });
+          if (bestMatch && bestScore >= 10) ocrMatches[ep.name] = bestMatch.id;
+        }
+      });
+      renderAddRoundModal();
+    })
+    .catch(function(err) {
+      if (indicator) indicator.classList.add('hidden');
+      alert('Fejl: ' + err.message);
+    });
+}
+
 function handleImageUpload(event) {
   var files = Array.from(event.target.files || []);
   if (files.length === 0) return;
@@ -2762,25 +2845,6 @@ function handleImageUpload(event) {
   ocrError = '';
   renderAddRoundModal();
   
-  // First discover which model is available with this key
-  var discoverModel = function() {
-    return fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + GEMINI_API_KEY)
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.error) throw new Error('Nøgle fejl: ' + data.error.message);
-        var models = (data.models || []);
-        // Find first vision model that supports generateContent
-        var visionModel = models.find(function(m) {
-          return m.supportedGenerationMethods && 
-                 m.supportedGenerationMethods.indexOf('generateContent') >= 0 &&
-                 (m.name.indexOf('flash') >= 0 || m.name.indexOf('pro') >= 0);
-        });
-        if (!visionModel) throw new Error('Ingen Gemini vision-model tilgængelig med denne nøgle. Modeller fundet: ' + models.map(function(m){return m.name;}).join(', '));
-        // Extract just model ID from "models/gemini-xxx"
-        return visionModel.name.replace('models/', '');
-      });
-  };
-
   Promise.all(files.map(function(file) { return compressImage(file); }))
   .then(function(base64Images) {
     return discoverModel().then(function(modelId) {

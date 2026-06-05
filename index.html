@@ -2762,39 +2762,59 @@ function handleImageUpload(event) {
   ocrError = '';
   renderAddRoundModal();
   
-  Promise.all(files.map(function(file) { return compressImage(file); }))
-  .then(function(base64Images) {
-    var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: the second number in "Score X/Y" at the bottom\n- grossScore: the first number in "Score X/Y"\n- holeScores: every number in the Score row, left to right, EXCLUDING the Ud total column\n- holePars: every number in the Par row, left to right, EXCLUDING the Ud total column\n- date: from "Game MM/DD/YYYY" converted to YYYY-MM-DD\n- holes: "For9" if holes 1-9, "Bag9" if holes 10-18, "18" if 18 holes';
-
-    // Call Gemini 2.0 Flash directly from browser — fast, CORS-friendly, accurate
-    return Promise.all(base64Images.map(function(img) {
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + GEMINI_API_KEY, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: 'image/jpeg', data: img } }
-            ]
-          }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
-        })
-      })
+  // First discover which model is available with this key
+  var discoverModel = function() {
+    return fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + GEMINI_API_KEY)
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        if (data.error) throw new Error('Gemini fejl: ' + data.error.message + ' (kode: ' + data.error.code + ')');
-        var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
-        if (!text) throw new Error('Gemini returnerede tomt svar');
-        var m = text.match(/\{[\s\S]*\}/);
-        if (!m) throw new Error('Intet JSON i Gemini-svar: ' + text.substring(0, 100));
-        return JSON.parse(m[0]);
-      })
-      .catch(function(err) {
-        console.error('Gemini OCR error:', err.message);
-        throw err; // Propagate so we see the real error
+        if (data.error) throw new Error('Nøgle fejl: ' + data.error.message);
+        var models = (data.models || []);
+        // Find first vision model that supports generateContent
+        var visionModel = models.find(function(m) {
+          return m.supportedGenerationMethods && 
+                 m.supportedGenerationMethods.indexOf('generateContent') >= 0 &&
+                 (m.name.indexOf('flash') >= 0 || m.name.indexOf('pro') >= 0);
+        });
+        if (!visionModel) throw new Error('Ingen Gemini vision-model tilgængelig med denne nøgle. Modeller fundet: ' + models.map(function(m){return m.name;}).join(', '));
+        // Extract just model ID from "models/gemini-xxx"
+        return visionModel.name.replace('models/', '');
       });
-    }));
+  };
+
+  Promise.all(files.map(function(file) { return compressImage(file); }))
+  .then(function(base64Images) {
+    return discoverModel().then(function(modelId) {
+      var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: the second number in "Score X/Y" at the bottom\n- grossScore: the first number in "Score X/Y"\n- holeScores: every number in the Score row, left to right, EXCLUDING the Ud total column\n- holePars: every number in the Par row, left to right, EXCLUDING the Ud total column\n- date: from "Game MM/DD/YYYY" converted to YYYY-MM-DD\n- holes: "For9" if holes 1-9, "Bag9" if holes 10-18, "18" if 18 holes';
+
+      return Promise.all(base64Images.map(function(img) {
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelId + ':generateContent?key=' + GEMINI_API_KEY, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: 'image/jpeg', data: img } }
+              ]
+            }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) throw new Error('Gemini fejl: ' + data.error.message + ' (kode: ' + data.error.code + ')');
+          var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
+          if (!text) throw new Error('Gemini returnerede tomt svar (model: ' + modelId + ')');
+          var m = text.match(/\{[\s\S]*\}/);
+          if (!m) throw new Error('Intet JSON i Gemini-svar: ' + text.substring(0, 100));
+          return JSON.parse(m[0]);
+        })
+        .catch(function(err) {
+          console.error('Gemini OCR error:', err.message);
+          throw err;
+        });
+      }));
+    });
   })
   .then(function(results) {
     var allPlayers = [];

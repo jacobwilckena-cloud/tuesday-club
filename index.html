@@ -2685,6 +2685,29 @@ function compressImage(file) {
   });
 }
 
+var _geminiModelCache = null;
+function getGeminiModel() {
+  if (_geminiModelCache) return Promise.resolve(_geminiModelCache);
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + GEMINI_API_KEY)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) throw new Error('Gemini: ' + data.error.message);
+      var models = (data.models || []).filter(function(m) {
+        return m.supportedGenerationMethods && m.supportedGenerationMethods.indexOf('generateContent') >= 0;
+      }).map(function(m) { return m.name.replace(/^models\//, ''); });
+      // Prefer a fast flash vision model, fall back to anything usable
+      var prefer = ['gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'];
+      var chosen = null;
+      for (var i = 0; i < prefer.length; i++) {
+        if (models.indexOf(prefer[i]) >= 0) { chosen = prefer[i]; break; }
+      }
+      if (!chosen) chosen = models.find(function(m) { return m.indexOf('flash') >= 0; }) || models[0];
+      if (!chosen) throw new Error('Ingen brugbar Gemini-model fundet for din nøgle');
+      _geminiModelCache = chosen;
+      return chosen;
+    });
+}
+
 function ocrHandleUpload(event) {
   var file = event.target.files && event.target.files[0];
   event.target.value = '';
@@ -2702,13 +2725,15 @@ function ocrHandleUpload(event) {
 
   compressImage(file)
     .then(function(img) {
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + GEMINI_API_KEY, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: img } }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
-        })
+      return getGeminiModel().then(function(model) {
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: img } }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+          })
+        });
       });
     })
     .then(function(r) { return r.json(); })
@@ -3167,7 +3192,7 @@ function handleHandicapUpload(event) {
     .then(function(images) {
       var hcpPrompt = 'This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value. HCP can be a number (e.g. 11.6) or plus-handicap (e.g. +1.5 means better than scratch). Convert comma decimals to dots.\n\nReturn ONLY this JSON:\n{"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Martin Juul","handicap":20.3}]}';
       return Promise.all(images.map(function(img) {
-        return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + GEMINI_API_KEY, {
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.0-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3419,7 +3444,7 @@ function generatePlayerSummary(playerId) {
 
   var summaryPrompt = 'Du er en golf-kommentator for Tuesday Club hos Mølleåens Golfklub. Skriv en kort, personlig sæsonanalyse på dansk (3-5 sætninger) for spilleren baseret på data nedenfor. Inkludér placering på leaderboardet, form, og sammenlign med de andre spillere. Vær positiv men ærlig. Brug golfterminologi. Tredje person.\n\n' + context;
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + GEMINI_API_KEY, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.0-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

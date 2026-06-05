@@ -946,6 +946,13 @@ body {
     </div>
     
     <div id="adminHandicapContent" class="hidden">
+      <div style="margin-bottom:24px; padding:16px; background:rgba(201,176,113,0.05); border:1px solid rgba(201,176,113,0.15);">
+        <h3 style="font-size:16px;color:#EFE7D2;margin-bottom:8px;">🔑 Gemini API Nøgle</h3>
+        <p style="color:#B8AE95;font-size:12px;margin-bottom:12px;">Nødvendig for scorecard-scanning. Gemmes kun i din browser.</p>
+        <input type="text" id="geminiKeyInput" placeholder="AQ... eller AIza..." style="width:100%;padding:10px;background:#0A0F0C;border:1px solid rgba(201,176,113,0.3);color:#EFE7D2;font-size:13px;margin-bottom:8px;">
+        <button onclick="saveGeminiKey()" class="btn-secondary" style="font-size:12px;">Gem nøgle</button>
+        <span id="geminiKeyStatus" style="font-size:12px;margin-left:12px;"></span>
+      </div>
       <div style="margin-bottom: 24px;">
         <h3 style="font-size: 20px; color: #EFE7D2; margin-bottom: 8px;">📊 Opdater Handicap</h3>
         <p style="color: #B8AE95; font-size: 14px; margin-bottom: 16px;">Upload screenshot fra GolfBox/DGU handicapliste. Appen finder automatisk dine spillere og foreslår opdateringer.</p>
@@ -1123,6 +1130,7 @@ console.log('=== TUESDAY CLUB - FINAL VERSION ===');
 var SUPABASE_URL = "https://fhfzxfjzkcojbgrsbkgz.supabase.co";
 var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZnp4Zmp6a2NvamJncnNia2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNDI5NTAsImV4cCI6MjA5MjYxODk1MH0.k1o3ZUDt_bJae3tnBi3jKpowbtVmwdusDtOCm41tfyU";
 var NVIDIA_API_KEY = "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";
+var GEMINI_API_KEY = localStorage.getItem('geminiKey') || "";
 var LOGIN_PIN = "1234";
 var ADMIN_PIN = "2606";
 var currentPin = "";
@@ -2743,49 +2751,51 @@ function handleImageUpload(event) {
   var files = Array.from(event.target.files || []);
   if (files.length === 0) return;
   
+  if (!GEMINI_API_KEY) {
+    ocrState = 'error';
+    ocrError = 'Ingen Gemini API-nøgle. Gå til ⚙️ Admin → Handicap → indsæt din nøgle først.';
+    renderAddRoundModal();
+    return;
+  }
+  
   ocrState = 'loading';
   ocrError = '';
   renderAddRoundModal();
   
   Promise.all(files.map(function(file) { return compressImage(file); }))
   .then(function(base64Images) {
-    // Process sequentially via Netlify to avoid CORS and parallel timeouts
-    var results = [];
-    var processNext = function(idx) {
-      if (idx >= base64Images.length) return Promise.resolve(results);
-      
-      // Update loading message
-      var loadingEl = document.getElementById('ocrLoadingSection');
-      if (loadingEl) {
-        var msgEl = loadingEl.querySelector('p, div');
-        if (msgEl) msgEl.textContent = 'Analyserer billede ' + (idx+1) + ' af ' + base64Images.length + '...';
-      }
+    var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: the second number in "Score X/Y" at the bottom\n- grossScore: the first number in "Score X/Y"\n- holeScores: every number in the Score row, left to right, EXCLUDING the Ud total column\n- holePars: every number in the Par row, left to right, EXCLUDING the Ud total column\n- date: from "Game MM/DD/YYYY" converted to YYYY-MM-DD\n- holes: "For9" if holes 1-9, "Bag9" if holes 10-18, "18" if 18 holes';
 
-      return fetch('/.netlify/functions/ocr', {
+    // Call Gemini 2.0 Flash directly from browser — fast, CORS-friendly, accurate
+    return Promise.all(base64Images.map(function(img) {
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_API_KEY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64Images[idx] })
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: 'image/jpeg', data: img } }
+            ]
+          }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+        })
       })
-      .then(function(r) { return r.text(); })
-      .then(function(text) {
-        try {
-          var data = JSON.parse(text);
-          if (data && data.players) results.push(data);
-        } catch(e) {
-          // Try to extract JSON from text
-          var m = text.match(/\{[\s\S]*\}/);
-          if (m) {
-            try { results.push(JSON.parse(m[0])); } catch(e2) {}
-          }
-        }
-        return processNext(idx + 1);
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) throw new Error('Gemini: ' + data.error.message);
+        var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
+        var m = text.match(/\{[\s\S]*\}/);
+        if (!m) throw new Error('Ingen data i Gemini-svar');
+        return JSON.parse(m[0]);
       })
-      .catch(function() {
-        return processNext(idx + 1); // Continue even if one fails
+      .catch(function(err) {
+        console.error('Gemini OCR error:', err);
+        return null; // Continue with other images
       });
-    };
-
-    return processNext(0);
+    })).then(function(arr) {
+      return arr.filter(function(x) { return x !== null; });
+    });
   })
   .then(function(results) {
     var allPlayers = [];
@@ -3146,6 +3156,8 @@ function switchAdminTab(tab) {
   } else if (tab === 'handicap') {
     document.getElementById('adminTabHandicap').style.borderBottomColor = '#C9B071';
     document.getElementById('adminHandicapContent').classList.remove('hidden');
+    var keyInput = document.getElementById('geminiKeyInput');
+    if (keyInput && GEMINI_API_KEY) keyInput.value = GEMINI_API_KEY;
   } else if (tab === 'data') {
     document.getElementById('adminTabData').style.borderBottomColor = '#C9B071';
     document.getElementById('adminDataContent').classList.remove('hidden');
@@ -3165,12 +3177,27 @@ function handleHandicapUpload(event) {
 
   Promise.all(files.map(function(file) { return compressImage(file); }))
     .then(function(images) {
+      var hcpPrompt = 'This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value. HCP can be a number (e.g. 11.6) or plus-handicap (e.g. +1.5 means better than scratch). Convert comma decimals to dots.\n\nReturn ONLY this JSON:\n{"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Martin Juul","handicap":20.3}]}';
       return Promise.all(images.map(function(img) {
-        return fetch('/.netlify/functions/ocr', {
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_API_KEY, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: img, type: 'handicap' })
-        }).then(function(r) { return r.json(); });
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { text: hcpPrompt },
+              { inline_data: { mime_type: 'image/jpeg', data: img } }
+            ]}],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 1500 }
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) throw new Error('Gemini: ' + data.error.message);
+          var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
+          var m = text.match(/\{[\s\S]*\}/);
+          return m ? JSON.parse(m[0]) : { players: [] };
+        })
+        .catch(function(err) { console.error('HCP OCR error:', err); return { players: [] }; });
       }));
     })
     .then(function(results) {
@@ -3338,6 +3365,20 @@ function saveApprovedHandicap() {
     });
 }
 
+function saveGeminiKey() {
+  var key = document.getElementById('geminiKeyInput').value.trim();
+  var status = document.getElementById('geminiKeyStatus');
+  if (!key) {
+    status.textContent = 'Indtast en nøgle';
+    status.style.color = '#ef4444';
+    return;
+  }
+  localStorage.setItem('geminiKey', key);
+  GEMINI_API_KEY = key;
+  status.textContent = '✓ Gemt';
+  status.style.color = '#4ade80';
+}
+
 function generatePlayerSummary(playerId) {
   var player = players.find(function(p){ return p.id === playerId; });
   if (!player) return;
@@ -3388,16 +3429,23 @@ function generatePlayerSummary(playerId) {
     'Seneste runder: '+recentStr+'\n'+
     'Andre spillere: '+othersStr;
 
-  fetch('/.netlify/functions/ocr', {
+  var summaryPrompt = 'Du er en golf-kommentator for Tuesday Club hos Mølleåens Golfklub. Skriv en kort, personlig sæsonanalyse på dansk (3-5 sætninger) for spilleren baseret på data nedenfor. Inkludér placering på leaderboardet, form, og sammenlign med de andre spillere. Vær positiv men ærlig. Brug golfterminologi. Tredje person.\n\n' + context;
+
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_API_KEY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'summary', context: context, playerName: player.name })
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: summaryPrompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 400 }
+    })
   })
   .then(function(r){ return r.json(); })
   .then(function(data) {
+    if (data.error) throw new Error(data.error.message);
+    var summary = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
     if (loadingEl) loadingEl.style.display = 'none';
     if (summaryEl) {
-      summaryEl.textContent = data.summary || 'Ingen analyse tilgængelig.';
+      summaryEl.textContent = summary || 'Ingen analyse tilgængelig.';
       summaryEl.style.display = 'block';
     }
   })

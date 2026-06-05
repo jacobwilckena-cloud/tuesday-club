@@ -2935,6 +2935,8 @@ function ocrRenderQueue() {
 
 function ocrSaveAll() {
   if (ocrQueue.length === 0) return;
+
+  updateRoundDate();
   var participants = [];
   var scores = {};
   ocrQueue.forEach(function(card) {
@@ -2947,9 +2949,39 @@ function ocrSaveAll() {
       holePars: card.ep.holePars || []
     };
   });
-  window.pendingMultiplayerRound = { participants: participants, scores: scores };
-  ocrResetAll();
-  renderMultiplayerForm();
+
+  var roundData = {
+    date: document.getElementById('roundDate').value,
+    course: document.getElementById('roundCourse').value,
+    holes: document.getElementById('roundHoles').value,
+    participants: participants,
+    scores: scores
+  };
+
+  // Show saving state on the queue's save button
+  var queueStep = document.getElementById('ocrStep_queue');
+  var saveBtn = queueStep ? queueStep.querySelector('.btn-primary') : null;
+  if (saveBtn) { saveBtn.textContent = '⏳ Gemmer...'; saveBtn.disabled = true; }
+
+  saveRound(roundData)
+    .then(function() { return loadRounds(); })
+    .then(function() {
+      renderContent();
+      ocrResetAll();
+      window.pendingMultiplayerRound = null;
+      var successDiv = document.getElementById('addRoundSuccess');
+      if (successDiv) {
+        successDiv.textContent = '✅ ' + participants.length + ' runde' + (participants.length !== 1 ? 'r' : '') + ' gemt!';
+        successDiv.classList.remove('hidden');
+      }
+      setTimeout(closeAddRoundModal, 1800);
+    })
+    .catch(function(error) {
+      ocrShowError('Kunne ikke gemme: ' + error.message);
+    })
+    .finally(function() {
+      if (saveBtn) { saveBtn.textContent = '💾 Gem alle'; saveBtn.disabled = false; }
+    });
 }
 
 function ocrResetAll() {
@@ -2963,6 +2995,61 @@ function ocrResetAll() {
 // ── Legacy stubs (keep old call sites from crashing) ──────────────────────
 function renderAddRoundModal() {}
 function cancelOcr() { ocrResetAll(); }
+
+function handleAddRound(event) {
+  event.preventDefault();
+  updateRoundDate();
+
+  var errorDiv = document.getElementById('addRoundError');
+  var successDiv = document.getElementById('addRoundSuccess');
+  if (errorDiv) errorDiv.classList.add('hidden');
+  if (successDiv) successDiv.classList.add('hidden');
+
+  var roundData = {
+    date: document.getElementById('roundDate').value,
+    course: document.getElementById('roundCourse').value,
+    holes: document.getElementById('roundHoles').value,
+    participants: [],
+    scores: {}
+  };
+
+  if (window.pendingMultiplayerRound && window.pendingMultiplayerRound.participants.length > 0) {
+    roundData.participants = window.pendingMultiplayerRound.participants;
+    roundData.scores = window.pendingMultiplayerRound.scores;
+  } else {
+    var playerId = parseInt(document.getElementById('roundPlayer').value);
+    var stableford = parseInt(document.getElementById('roundStableford').value);
+    var gross = parseInt(document.getElementById('roundGross').value) || 0;
+    var birdies = parseInt(document.getElementById('roundBirdies').value) || 0;
+    roundData.participants = [playerId];
+    roundData.scores[playerId] = { stableford: stableford, grossScore: gross, birdies: birdies };
+  }
+
+  var submitBtn = document.querySelector('#addRoundForm button[type="submit"]');
+  if (submitBtn) { submitBtn.textContent = 'Gemmer...'; submitBtn.disabled = true; }
+
+  saveRound(roundData)
+    .then(function() {
+      if (successDiv) { successDiv.textContent = '✅ Runde gemt!'; successDiv.classList.remove('hidden'); }
+      window.pendingMultiplayerRound = null;
+      renderMultiplayerForm();
+      return loadRounds();
+    })
+    .then(function() {
+      renderContent();
+      setTimeout(closeAddRoundModal, 1800);
+    })
+    .catch(function(error) {
+      if (errorDiv) {
+        errorDiv.textContent = '❌ Fejl: ' + error.message;
+        errorDiv.classList.remove('hidden');
+        errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    })
+    .finally(function() {
+      if (submitBtn) { submitBtn.textContent = 'Gem Runde'; submitBtn.disabled = false; }
+    });
+}
 
 
 function renderMultiplayerForm() {

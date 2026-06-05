@@ -2636,11 +2636,32 @@ function renderAddRoundModal() {
     
     var playersHTML = '';
     ocrResult.players.forEach(function(ep) {
-      playersHTML += '<div style="display: grid; grid-template-columns: 1fr 180px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(201,176,113,0.2);">';
+      // Pre-calculate birdies from holeScores if available
+      var calcBirdies = 0;
+      if (ep.holeScores && ep.holeScores.length > 0 && ep.holePars && ep.holePars.length > 0) {
+        for (var bi = 0; bi < ep.holeScores.length; bi++) {
+          if (ep.holePars[bi] && ep.holeScores[bi] < ep.holePars[bi]) calcBirdies++;
+        }
+      } else {
+        calcBirdies = ep.birdies || 0;
+      }
+      // Store initial value so applyOcrToForm can read it
+      if (!window.ocrBirdieOverrides) window.ocrBirdieOverrides = {};
+      window.ocrBirdieOverrides[ep.name] = calcBirdies;
+
+      playersHTML += '<div style="padding: 10px 0; border-bottom: 1px solid rgba(201,176,113,0.2);">';
+      playersHTML += '<div style="display: grid; grid-template-columns: 1fr 180px; gap: 12px; align-items: center;">';
       playersHTML += '<div>';
       playersHTML += '<div style="font-family: \'Crimson Text\', serif; font-size: 17px; color: #EFE7D2;">' + ep.name + '</div>';
       playersHTML += '<div style="font-family: Inter, sans-serif; font-size: 10px; color: #B8AE95; letter-spacing: 0.5px; margin-top: 2px;">';
-      playersHTML += ep.stableford + ' pts · ' + (ep.grossScore > 0 ? ep.grossScore + ' slag · ' : '') + (ep.birdies || 0) + ' birdies';
+      playersHTML += ep.stableford + ' pts' + (ep.grossScore > 0 ? ' · ' + ep.grossScore + ' slag' : '');
+      playersHTML += '</div>';
+      // Editable birdies field
+      playersHTML += '<div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">';
+      playersHTML += '<span style="font-family: Inter, sans-serif; font-size: 10px; color: #C9B071; letter-spacing: 1px; text-transform: uppercase;">🐦 Birdies</span>';
+      playersHTML += '<input type="number" min="0" max="9" value="' + calcBirdies + '" ';
+      playersHTML += 'onchange="if(!window.ocrBirdieOverrides)window.ocrBirdieOverrides={};window.ocrBirdieOverrides[\'' + ep.name.replace(/'/g, "\\'") + '\']=parseInt(this.value)||0" ';
+      playersHTML += 'style="width: 52px; padding: 4px 8px; background: #0A0F0C; border: 1px solid rgba(201,176,113,0.4); color: #EFE7D2; font-size: 15px; text-align: center;">';
       playersHTML += '</div>';
       playersHTML += '</div>';
       playersHTML += '<select onchange="ocrMatches[\'' + ep.name + '\'] = this.value ? parseInt(this.value) : undefined" style="background: #1F1C17; color: #EFE7D2; border: 1px solid rgba(201,176,113,0.3); padding: 10px; font-size: 14px; width: 100%;">';
@@ -2650,6 +2671,7 @@ function renderAddRoundModal() {
         playersHTML += '<option value="' + p.id + '"' + selected + '>' + p.name + '</option>';
       });
       playersHTML += '</select>';
+      playersHTML += '</div>';
       playersHTML += '</div>';
     });
     document.getElementById('ocrReviewPlayers').innerHTML = playersHTML;
@@ -2991,15 +3013,12 @@ function applyOcrToForm() {
     if (playerId) {
       participants.push(playerId);
       
-      // Calculate birdies from holeScores (reliable) instead of model count
+      // Use manually overridden birdies from review UI (user can correct OCR)
       var holeScores = ep.holeScores || [];
       var holePars = ep.holePars || [];
-      var calculatedBirdies = 0;
-      for (var hi = 0; hi < holeScores.length; hi++) {
-        if (holePars[hi] && holeScores[hi] < holePars[hi]) calculatedBirdies++;
-      }
-      // Use calculated if we have hole data, otherwise fall back to model count
-      var birdies = holeScores.length > 0 ? calculatedBirdies : (ep.birdies || 0);
+      var birdies = (window.ocrBirdieOverrides && window.ocrBirdieOverrides[ep.name] !== undefined)
+        ? window.ocrBirdieOverrides[ep.name]
+        : (ep.birdies || 0);
       
       scores[playerId] = {
         stableford: ep.stableford || 0,

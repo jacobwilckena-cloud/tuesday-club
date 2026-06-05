@@ -812,8 +812,8 @@ body {
       <div id="ocrAddingIndicator" class="hidden" style="text-align:center;padding:12px;font-family:Inter,sans-serif;font-size:12px;color:#B8AE95;">⏳ Analyserer scorecard...</div>
       <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
         <button type="button" onclick="applyOcrToForm()" class="btn-primary" style="flex: 1;">Brug Data</button>
+        <label for="addMoreScorecardInput" class="btn-secondary" style="flex:1;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;">➕ Tilføj scorecard</label>
         <input type="file" id="addMoreScorecardInput" accept="image/*" style="display:none" onchange="handleAddMoreScorecard(event)">
-        <button type="button" onclick="document.getElementById(\'addMoreScorecardInput\').click()" class="btn-secondary" style="flex: 1;">➕ Tilføj scorecard</button>
         <button type="button" onclick="cancelOcr()" class="btn-secondary" style="flex: 1; flex-basis: 100%;">Annuller</button>
       </div>
     </div>

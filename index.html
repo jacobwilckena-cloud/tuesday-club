@@ -2674,40 +2674,39 @@ function ocrHandleUpload(event) {
   ocrShowStep('scanning');
   document.getElementById('ocrErrorBanner').classList.add('hidden');
 
+  var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: the second number in "Score X/Y" at the bottom\n- grossScore: the first number in "Score X/Y"\n- holeScores: every number in the Score row, left to right, EXCLUDING the Ud total column\n- holePars: every number in the Par row, left to right, EXCLUDING the Ud total column\n- date: from "Game MM/DD/YYYY" converted to YYYY-MM-DD\n- holes: "For9" if holes 1-9, "Bag9" if holes 10-18, "18" if 18 holes';
+
   compressImage(file)
     .then(function(img) {
-      return discoverModel().then(function(modelId) {
-        var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: the second number in "Score X/Y" at the bottom\n- grossScore: the first number in "Score X/Y"\n- holeScores: every number in the Score row, left to right, EXCLUDING the Ud total column\n- holePars: every number in the Par row, left to right, EXCLUDING the Ud total column\n- date: from "Game MM/DD/YYYY" converted to YYYY-MM-DD\n- holes: "For9" if holes 1-9, "Bag9" if holes 10-18, "18" if 18 holes';
-        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelId + ':generateContent?key=' + GEMINI_API_KEY, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: img } }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
-          })
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + GEMINI_API_KEY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: img } }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
         })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.error) throw new Error('Gemini: ' + data.error.message);
-          var text = (data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]&&data.candidates[0].content.parts[0].text) || '';
-          if (!text) throw new Error('Tomt svar fra Gemini');
-          var clean = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
-          var m = clean.match(/\{[\s\S]*\}/);
-          if (!m) throw new Error('Intet JSON i svar');
-          return JSON.parse(m[0]);
-        });
       });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) throw new Error('Gemini: ' + data.error.message);
+      var text = (data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]&&data.candidates[0].content.parts[0].text) || '';
+      if (!text) throw new Error('Tomt svar fra Gemini');
+      var clean = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+      var m = clean.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('Intet JSON i svar');
+      return JSON.parse(m[0]);
     })
     .then(function(result) {
       var ep = result.players && result.players[0];
       if (!ep) throw new Error('Ingen spiller fundet i billedet');
 
-      // Pre-fill date if first card
+      // Pre-fill date on first card
       if (result.date && result.date.match(/^\d{4}-\d{2}-\d{2}$/) && ocrQueue.length === 0) {
-        var p = result.date.split('-');
-        document.getElementById('roundYear').value = p[0];
-        document.getElementById('roundMonth').value = p[1];
-        document.getElementById('roundDay').value = String(parseInt(p[2]));
+        var dp = result.date.split('-');
+        document.getElementById('roundYear').value = dp[0];
+        document.getElementById('roundMonth').value = dp[1];
+        document.getElementById('roundDay').value = String(parseInt(dp[2]));
         updateRoundDate();
       }
       if (result.holes) document.getElementById('roundHoles').value = result.holes;
@@ -2741,7 +2740,6 @@ function ocrHandleUpload(event) {
     })
     .catch(function(err) {
       ocrShowError(err.message || 'Noget gik galt');
-      // Go back to whichever step makes sense
       ocrShowStep(ocrQueue.length > 0 ? 'queue' : 'idle');
     });
 }

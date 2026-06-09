@@ -1145,7 +1145,7 @@ console.log('=== TUESDAY CLUB - FINAL VERSION ===');
 // ========== CONFIGURATION ==========
 var SUPABASE_URL = "https://fhfzxfjzkcojbgrsbkgz.supabase.co";
 var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZnp4Zmp6a2NvamJncnNia2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNDI5NTAsImV4cCI6MjA5MjYxODk1MH0.k1o3ZUDt_bJae3tnBi3jKpowbtVmwdusDtOCm41tfyU";
-var NVIDIA_API_KEY = "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";
+// NVIDIA key removed — all AI calls now use Gemini
 var GEMINI_API_KEY = localStorage.getItem('geminiKey') || "";
 var LOGIN_PIN = "1234";
 var ADMIN_PIN = "2606";
@@ -1167,10 +1167,7 @@ var isLoggedIn = localStorage.getItem('tuesdayLogin') === 'true';
 var isAdmin = localStorage.getItem('tuesdayAdmin') === 'true';
 var currentAdminTab = 'players';
 var editingRound = null;
-var ocrState = 'idle'; // idle | loading | review | error
-var ocrError = '';
-var ocrResult = null; // { players: [...], course, holes }
-var ocrMatches = {}; // { extractedName: playerId }
+// Old OCR state vars removed — see ocrStep/ocrCurrentCard/ocrQueue
 
 // ========== TABS ==========
 var TABS = [
@@ -2995,6 +2992,15 @@ function ocrResetAll() {
 // ── Legacy stubs (keep old call sites from crashing) ──────────────────────
 function renderAddRoundModal() {}
 function cancelOcr() { ocrResetAll(); }
+
+function closeAddRoundModal() {
+  document.getElementById('addRoundModal').classList.add('hidden');
+  var errorDiv = document.getElementById('addRoundError');
+  var successDiv = document.getElementById('addRoundSuccess');
+  if (errorDiv) errorDiv.classList.add('hidden');
+  if (successDiv) successDiv.classList.add('hidden');
+  ocrResetAll();
+}
 
 function handleAddRound(event) {
   event.preventDefault();

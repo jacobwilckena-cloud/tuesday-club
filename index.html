@@ -2797,8 +2797,11 @@ function getGeminiModel() {
 
 // Call Gemini with auto-retry on 503/overload and model fallback.
 // attempt 1: preferred model · attempt 2: same model after 2s · attempt 3: fallback model (flash-lite) after 3s
+// Quota-friendly: max 2 requests per scan (1 retry on fallback model after 5s).
+// A 429 rate-limit is NEVER retried — that would burn quota for nothing.
+var _lastGeminiCall = 0;
+
 function geminiGenerate(body) {
-  var fallbacks = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
   function callModel(model) {
     return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY, {
       method: 'POST',
@@ -2809,18 +2812,25 @@ function geminiGenerate(body) {
   function isOverloaded(data) {
     return data.error && (data.error.code === 503 || /high demand|overloaded|unavailable/i.test(data.error.message || ''));
   }
+  function isRateLimited(data) {
+    return data.error && (data.error.code === 429 || /quota|rate/i.test(data.error.message || ''));
+  }
   function wait(ms) { return new Promise(function(res) { setTimeout(res, ms); }); }
 
-  return getGeminiModel().then(function(model) {
+  // Soft client-side throttle: min 7s between scans keeps us under ~10 req/min
+  var now = Date.now();
+  var sinceLast = now - _lastGeminiCall;
+  var throttleWait = sinceLast < 7000 ? 7000 - sinceLast : 0;
+  _lastGeminiCall = now + throttleWait;
+
+  return wait(throttleWait).then(function() {
+    return getGeminiModel();
+  }).then(function(model) {
     return callModel(model).then(function(data) {
-      if (!isOverloaded(data)) return data;
-      // Retry same model after 2s
-      return wait(2000).then(function() { return callModel(model); }).then(function(data2) {
-        if (!isOverloaded(data2)) return data2;
-        // Try fallback model after 3s
-        var fb = fallbacks[0] !== model ? fallbacks[0] : fallbacks[1];
-        return wait(3000).then(function() { return callModel(fb); });
-      });
+      if (!isOverloaded(data) || isRateLimited(data)) return data;
+      // ONE retry on the lighter fallback model after 5s
+      var fb = model === 'gemini-2.5-flash-lite' ? 'gemini-flash-lite-latest' : 'gemini-2.5-flash-lite';
+      return wait(5000).then(function() { return callModel(fb); });
     });
   });
 }

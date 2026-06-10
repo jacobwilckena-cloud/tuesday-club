@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baneguide Billeder — Tuesday Club</title>
+<style>
+  body { background: #0A0F0C; color: #EFE7D2; font-family: Georgia, serif; margin: 0; padding: 20px; }
+  h1 { color: #C9B071; font-size: 24px; }
+  p.hint { color: #B8AE95; font-size: 14px; font-style: italic; line-height: 1.5; }
+  .hole { margin-bottom: 32px; }
+  .hole h2 { color: #C9B071; font-size: 18px; margin-bottom: 8px; }
+  .hole img { width: 100%; height: auto; border: 1px solid rgba(201,176,113,0.3); border-radius: 4px; display: block; }
+</style>
+</head>
+<body>
+<h1>⛳ Baneguide — alle 18 huller</h1>
+<p class="hint">Hold fingeren på et billede → "Føj til fotos" for at gemme det.<br>
+Gem dem du vil dele, og upload dem i chatten.</p>
+<div id="holes"></div>
+<script>
+var imgs = [
+  ['46/Baneguide_Hul_01-469b6c7f','Hul 1 · Par 4 · Index 11'],
+  ['64/Baneguide_Hul_02-641f8f8c','Hul 2 · Par 4 · Index 9'],
+  ['f8/Baneguide_Hul_03-f8db4ed7','Hul 3 · Par 3 · Index 15'],
+  ['eb/Baneguide_Hul_04-ebd44332','Hul 4 · Par 5 · Index 1'],
+  ['9b/Baneguide_Hul_05-9b57ae93','Hul 5 · Par 4 · Index 3'],
+  ['dc/Baneguide_Hul_06-dcf6565f','Hul 6 · Par 3 · Index 17'],
+  ['20/Baneguide_Hul_07-20fca0c0','Hul 7 · Par 4 · Index 13'],
+  ['3b/Baneguide_Hul_08-3bdbbf32','Hul 8 · Par 4 · Index 5'],
+  ['e4/Baneguide_Hul_09-e4dc87f1','Hul 9 · Par 4 · Index 7'],
+  ['14/Baneguide_Hul_10-1471ee12','Hul 10 · Par 5 · Index 4'],
+  ['ed/Baneguide_Hul_11-ed0d63a5','Hul 11 · Par 3 · Index 16'],
+  ['be/Baneguide_Hul_12-bebaf0b3','Hul 12 · Par 4 · Index 12'],
+  ['48/Baneguide_Hul_13-480e7c1c','Hul 13 · Par 5 · Index 8'],
+  ['ff/Baneguide_Hul_14-ff31468e','Hul 14 · Par 3 · Index 14'],
+  ['a8/Baneguide_Hul_15-a8189f1c','Hul 15 · Par 4 · Index 10'],
+  ['04/Baneguide_Hul_16-04a359bf','Hul 16 · Par 5 · Index 2'],
+  ['a7/Baneguide_Hul_17-a72f8760','Hul 17 · Par 3 · Index 18'],
+  ['66/Baneguide_Hul_18-66dce0b7','Hul 18 · Par 4 · Index 6']
+];
+var html = '';
+imgs.forEach(function(it) {
+  html += '<div class="hole"><h2>' + it[1] + '</h2>' +
+    '<img src="https://www.mgk.dk/media/yootheme/cache/' + it[0] + '.jpg" alt="' + it[1] + '" loading="lazy"></div>';
+});
+document.getElementById('holes').innerHTML = html;
+</script>
+</body>
+</html>

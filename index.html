@@ -4226,23 +4226,10 @@ function loadSupabase() {
 // ========== INITIALIZATION ==========
 function init() {
   console.log('🚀 Tuesday Club initialized');
-  
-  // Auto-login if previously logged in
-  if (isLoggedIn) {
-    document.getElementById('logoutBtn').style.display = '';
-    document.getElementById('adminBtn').style.display = '';
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('mainApp').classList.remove('hidden');
-    loadSupabase().then(loadPlayers).then(loadRounds).then(function() {
-      renderNavTabs();
-      renderContent();
-    });
-    return;
-  }
-  
+
   // Init PIN buttons with visual touch feedback
   initPinButtons();
-  
+
   var addRoundForm = document.getElementById('addRoundForm');
   if (addRoundForm) {
     addRoundForm.addEventListener('submit', handleAddRound);
@@ -4307,6 +4294,18 @@ function init() {
   if (adminPinModal) {
     adminPinModal.addEventListener('click', function(e) {
       if (e.target.id === 'adminPinModal') closeAdminPinPrompt();
+    });
+  }
+
+  // Auto-login if previously logged in — AFTER listeners so forms always work
+  if (isLoggedIn) {
+    document.getElementById('logoutBtn').style.display = '';
+    document.getElementById('adminBtn').style.display = '';
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    loadSupabase().then(loadPlayers).then(loadRounds).then(function() {
+      renderNavTabs();
+      renderContent();
     });
   }
 }

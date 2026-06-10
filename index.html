@@ -3742,28 +3742,29 @@ function handleHandicapUpload(event) {
 
   Promise.all(files.map(function(file) { return compressImage(file); }))
     .then(function(images) {
-      var hcpPrompt = 'This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value. HCP can be a number (e.g. 11.6) or plus-handicap (e.g. +1.5 means better than scratch). Convert comma decimals to dots.\n\nReturn ONLY this JSON:\n{"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Martin Juul","handicap":20.3}]}';
-      return Promise.all(images.map(function(img) {
-        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.5-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+      var hcpPrompt = 'This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value. Convert comma decimals to dots (11,6 → 11.6).\n\nIMPORTANT — plus handicaps: a value shown as "+2.2" (plus handicap, better than scratch) MUST be returned as a NEGATIVE number: -2.2. A normal handicap like 13.7 stays positive.\n\nReturn ONLY this JSON:\n{"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Alexander Bo Jensen","handicap":-2.2}]}';
+      // Sequential (not parallel) via geminiGenerate → throttle + Groq fallback respected
+      var collected = [];
+      var chain = Promise.resolve();
+      images.forEach(function(img) {
+        chain = chain.then(function() {
+          return geminiGenerate({
             contents: [{ parts: [
               { text: hcpPrompt },
               { inline_data: { mime_type: 'image/jpeg', data: img } }
             ]}],
             generationConfig: { temperature: 0.1, maxOutputTokens: 1500 }
           })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.error) throw new Error('Gemini: ' + data.error.message);
-          var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
-          var m = text.match(/\{[\s\S]*\}/);
-          return m ? JSON.parse(m[0]) : { players: [] };
-        })
-        .catch(function(err) { console.error('HCP OCR error:', err); return { players: [] }; });
-      }));
+          .then(function(data) {
+            if (data.error) throw new Error('Gemini: ' + data.error.message);
+            var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
+            var m = text.match(/\{[\s\S]*\}/);
+            collected.push(m ? JSON.parse(m[0]) : { players: [] });
+          })
+          .catch(function(err) { console.error('HCP OCR error:', err); collected.push({ players: [] }); });
+        });
+      });
+      return chain.then(function() { return collected; });
     })
     .then(function(results) {
       // Merge all extracted players
@@ -3793,7 +3794,7 @@ function handleHandicapUpload(event) {
           }
         });
 
-        if (match && match.handicap !== player.handicap) {
+        if (match && typeof match.handicap === 'number' && Math.abs(match.handicap - player.handicap) >= 0.05) {
           handicapProposals.push({
             player: player,
             newHandicap: match.handicap,

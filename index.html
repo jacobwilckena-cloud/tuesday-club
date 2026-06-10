@@ -2761,7 +2761,7 @@ function ocrHandleUpload(event) {
   ocrShowStep('scanning');
   document.getElementById('ocrErrorBanner').classList.add('hidden');
 
-  var prompt = 'This is a Golf GameBook leaderboard screenshot. It shows a ranked list of players. ONE player has been tapped open, revealing an expanded scorecard table (rows: Hul, Handicap, Par, Score, Point).\n\nCRITICAL — identifying the correct player:\nThe expanded table belongs to the player whose name card appears DIRECTLY ABOVE the table, immediately adjacent to it. Other players in the list are NOT the right one, even if they appear first or at the top of the screen. Find the "Hul" header row, then look at the name card immediately above it — THAT is the player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player whose card sits immediately above the expanded table (full name from that card, even if truncated with ...)\n- stableford: the second number in "Score X/Y" below the table (also matches the Point row total)\n- grossScore: the first number in "Score X/Y" (also matches the Score row total in the Ud/In column)\n- holeScores: ALL numbers in the Score row, left to right, EXCLUDING the final Ud/In total column. For9/Bag9 = exactly 9 numbers, 18 holes = 18 numbers\n- holePars: ALL numbers in the Par row, same way, same count as holeScores\n- date: from "Game MM/DD/YYYY" at top, converted to YYYY-MM-DD\n- holes: "For9" if Hul row shows 1-9, "Bag9" if 10-18, "18" if 18 holes\n\nVerify before answering: sum of holeScores must equal grossScore. If not, re-read the Score row.';
+  var prompt = 'This is a Golf GameBook leaderboard screenshot. It shows a ranked list of players. ONE player has been tapped open, revealing an expanded scorecard table (rows: Hul, Handicap, Par, Score, Point).\n\nCRITICAL — identifying the correct player:\nThe expanded table belongs to the player whose name card appears DIRECTLY ABOVE the table, immediately adjacent to it. Other players in the list are NOT the right one, even if they appear first or at the top of the screen. Find the "Hul" header row, then look at the name card immediately above it — THAT is the player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player whose card sits immediately above the expanded table (full name from that card, even if truncated with ...)\n- stableford: the second number in "Score X/Y" below the table (also matches the Point row total)\n- grossScore: the first number in "Score X/Y" (also matches the Score row total in the Ud/In column)\n- holeScores: ALL numbers in the Score row, left to right, EXCLUDING the final Ud/In total column. For9/Bag9 = exactly 9 numbers, 18 holes = 18 numbers\n- holePars: ALL numbers in the Par row, same way, same count as holeScores\n- date: from "Game MM/DD/YYYY" at top, converted to YYYY-MM-DD\n- holes: "For9" if Hul row shows 1-9, "Bag9" if 10-18, "18" if 18 holes\n\nDashed/picked-up holes: a "-" in the Score row means the player picked up. Use 0 for that hole in holeScores. If ANY hole shows "-", set grossScore to 0 (the total is not valid — GameBook shows "Score -/X").\n\nVerify before answering: if no holes are dashed, sum of holeScores must equal grossScore. If not, re-read the Score row.';
 
   compressImage(file)
     .then(function(img) {
@@ -2817,11 +2817,19 @@ function ocrHandleUpload(event) {
         if (sc > bestScore && sc >= 10) { bestScore = sc; bestMatch = p; }
       });
 
-      // Calculate birdies from holeScores
+      // Dashed holes (score 0) = picked up → gross total is invalid, keep only stableford
+      var hasDashedHoles = false;
+      if (ep.holeScores && ep.holeScores.length > 0) {
+        hasDashedHoles = ep.holeScores.some(function(s) { return !s || s === 0; });
+        if (hasDashedHoles) ep.grossScore = 0;
+      }
+      ep.hasDashedHoles = hasDashedHoles;
+
+      // Calculate birdies from holeScores (dashed holes can't be birdies — score 0 is skipped)
       var calcBirdies = 0;
       if (ep.holeScores && ep.holePars) {
         for (var bi = 0; bi < ep.holeScores.length; bi++) {
-          if (ep.holePars[bi] && ep.holeScores[bi] < ep.holePars[bi]) calcBirdies++;
+          if (ep.holeScores[bi] > 0 && ep.holePars[bi] && ep.holeScores[bi] < ep.holePars[bi]) calcBirdies++;
         }
       } else { calcBirdies = ep.birdies || 0; }
 
@@ -2852,8 +2860,13 @@ function ocrRenderReview() {
 
   var html = '';
 
-  // Sanity check: sum of holeScores should equal grossScore
-  if (ep.holeScores && ep.holeScores.length > 0 && ep.grossScore > 0) {
+  // Dashed holes info
+  if (ep.hasDashedHoles) {
+    html += '<div style="padding:10px 12px;background:rgba(201,176,113,0.1);border:1px solid rgba(201,176,113,0.3);margin-bottom:12px;font-family:Inter,sans-serif;font-size:12px;color:#C9B071;">ℹ️ Streget hul(ler) på kortet — kun stablefordpoint gemmes, ingen slagscore</div>';
+  }
+
+  // Sanity check: sum of holeScores should equal grossScore (only when no dashed holes)
+  if (!ep.hasDashedHoles && ep.holeScores && ep.holeScores.length > 0 && ep.grossScore > 0) {
     var sum = ep.holeScores.reduce(function(a, b) { return a + b; }, 0);
     if (sum !== ep.grossScore) {
       html += '<div style="padding:10px 12px;background:rgba(239,140,52,0.12);border:1px solid rgba(239,140,52,0.4);margin-bottom:12px;font-family:Inter,sans-serif;font-size:12px;color:#ef8c34;">⚠️ Hulscores summer til ' + sum + ' men totalen er ' + ep.grossScore + ' — tjek scorekortet og ret evt. manuelt</div>';
@@ -2894,7 +2907,12 @@ function ocrRenderReview() {
     // Score with notation
     html += '<tr><td style="padding:3px 5px;color:#B8AE95;font-size:9px;">Score</td>';
     for (var h = 0; h < ep.holeScores.length; h++) {
-      var s = ep.holeScores[h], p = ep.holePars[h], d = s - p;
+      var s = ep.holeScores[h], p = ep.holePars[h];
+      if (!s || s === 0) {
+        html += '<td style="padding:2px 2px;text-align:center;"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:12px;color:#B8AE95;">–</span></td>';
+        continue;
+      }
+      var d = s - p;
       var ns = 'display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:12px;font-weight:600;';
       if      (d <= -2) ns += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
       else if (d === -1) ns += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';
@@ -2994,7 +3012,12 @@ function ocrRenderQueue() {
     if (ep.holeScores && ep.holeScores.length > 0 && ep.holePars) {
       html += '<div style="display:flex;gap:3px;margin-top:6px;flex-wrap:wrap;">';
       for (var h = 0; h < ep.holeScores.length; h++) {
-        var s = ep.holeScores[h], p = ep.holePars[h], d = s - p;
+        var s = ep.holeScores[h], p = ep.holePars[h];
+        if (!s || s === 0) {
+          html += '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:10px;color:#B8AE95;">–</span>';
+          continue;
+        }
+        var d = s - p;
         var ns = 'display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:10px;font-weight:600;';
         if      (d <= -2) ns += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
         else if (d === -1) ns += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';

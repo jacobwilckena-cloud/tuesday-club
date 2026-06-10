@@ -1274,6 +1274,28 @@ function getBestOfN(numRounds) {
   return 8; // 8+
 }
 
+// Merge fragmented round rows (one per player) into virtual rounds per date+holes.
+// Needed because rounds were historically saved as separate rows per player.
+function getGroupedRounds() {
+  var groups = {};
+  var order = [];
+  rounds.forEach(function(r) {
+    if (!r.participants || !r.scores) return;
+    var key = r.date + '|' + r.holes;
+    if (!groups[key]) {
+      groups[key] = { date: r.date, holes: r.holes, course: r.course, participants: [], scores: {} };
+      order.push(key);
+    }
+    r.participants.forEach(function(pid) {
+      if (groups[key].participants.indexOf(pid) === -1) {
+        groups[key].participants.push(pid);
+      }
+      if (r.scores[pid]) groups[key].scores[pid] = r.scores[pid];
+    });
+  });
+  return order.map(function(k) { return groups[k]; });
+}
+
 function getPlayerStats(playerId, holeFilter) {
   // holeFilter: '9h' = kun 9-hullers, '18h' = kun 18-hullers, null = alle
   var playerRounds = rounds.filter(function(r) {
@@ -1328,19 +1350,20 @@ function getPlayerStats(playerId, holeFilter) {
   
   var bestRound = sortedByScore.length > 0 ? sortedByScore[0].stableford : 0;
   
-  // Wins (højeste score i hver runde)
+  // Wins — beregnet på dags-grupperede runder, så solo-rækker ikke giver gratis sejre.
+  // Kun dage med mindst 2 deltagere tæller som en konkurrence.
   var wins = 0;
-  for (var i = 0; i < playerRounds.length; i++) {
-    var r = playerRounds[i];
+  getGroupedRounds().forEach(function(g) {
+    if (holeFilter === '9h' && !(g.holes === 'For9' || g.holes === 'Bag9')) return;
+    if (holeFilter === '18h' && g.holes !== '18') return;
+    if (!g.scores[playerId]) return;
+    if (g.participants.length < 2) return;
     var maxScore = 0;
-    for (var j = 0; j < r.participants.length; j++) {
-      var pid = r.participants[j];
-      if (r.scores[pid] && r.scores[pid].stableford > maxScore) {
-        maxScore = r.scores[pid].stableford;
-      }
-    }
-    if (r.scores[playerId].stableford === maxScore) wins++;
-  }
+    g.participants.forEach(function(pid) {
+      if (g.scores[pid] && g.scores[pid].stableford > maxScore) maxScore = g.scores[pid].stableford;
+    });
+    if (g.scores[playerId].stableford === maxScore) wins++;
+  });
 
   return {
     rounds: playerRounds.length,
@@ -1809,7 +1832,7 @@ function renderStatistics() {
   html += '<div class="round-card" style="margin-bottom: 24px;">';
   html += '<h3 style="font-size: 22px; color: #EFE7D2; margin-bottom: 20px;">📊 Sæson Oversigt</h3>';
   
-  var totalRounds = rounds.length;
+  var totalRounds = getGroupedRounds().length;
   var totalBirdies = 0;
   var allScores = [];
   rounds.forEach(function(r) {

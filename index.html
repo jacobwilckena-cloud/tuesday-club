@@ -2750,7 +2750,7 @@ function ocrHandleUpload(event) {
   ocrShowStep('scanning');
   document.getElementById('ocrErrorBanner').classList.add('hidden');
 
-  var prompt = 'This is a Golf GameBook scorecard screenshot. ONE player has an expanded grid showing Par row, Score row, and Point row for each hole. Extract ONLY that expanded player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player with the expanded hole grid\n- stableford: the second number in "Score X/Y" at the bottom\n- grossScore: the first number in "Score X/Y"\n- holeScores: every number in the Score row, left to right, EXCLUDING the Ud total column\n- holePars: every number in the Par row, left to right, EXCLUDING the Ud total column\n- date: from "Game MM/DD/YYYY" converted to YYYY-MM-DD\n- holes: "For9" if holes 1-9, "Bag9" if holes 10-18, "18" if 18 holes';
+  var prompt = 'This is a Golf GameBook leaderboard screenshot. It shows a ranked list of players. ONE player has been tapped open, revealing an expanded scorecard table (rows: Hul, Handicap, Par, Score, Point).\n\nCRITICAL — identifying the correct player:\nThe expanded table belongs to the player whose name card appears DIRECTLY ABOVE the table, immediately adjacent to it. Other players in the list are NOT the right one, even if they appear first or at the top of the screen. Find the "Hul" header row, then look at the name card immediately above it — THAT is the player.\n\nReturn ONLY this JSON (no other text):\n{"course":"Molleaens Golf Klub","holes":"For9","date":"2026-04-21","players":[{"name":"Jacob Andersen","stableford":20,"grossScore":40,"holeScores":[4,5,4,6,6,2,3,5,5],"holePars":[4,4,3,5,4,3,4,4,4]}]}\n\nRules:\n- name: the player whose card sits immediately above the expanded table (full name from that card, even if truncated with ...)\n- stableford: the second number in "Score X/Y" below the table (also matches the Point row total)\n- grossScore: the first number in "Score X/Y" (also matches the Score row total in the Ud/In column)\n- holeScores: ALL numbers in the Score row, left to right, EXCLUDING the final Ud/In total column. For9/Bag9 = exactly 9 numbers, 18 holes = 18 numbers\n- holePars: ALL numbers in the Par row, same way, same count as holeScores\n- date: from "Game MM/DD/YYYY" at top, converted to YYYY-MM-DD\n- holes: "For9" if Hul row shows 1-9, "Bag9" if 10-18, "18" if 18 holes\n\nVerify before answering: sum of holeScores must equal grossScore. If not, re-read the Score row.';
 
   compressImage(file)
     .then(function(img) {
@@ -2840,6 +2840,14 @@ function ocrRenderReview() {
   }
 
   var html = '';
+
+  // Sanity check: sum of holeScores should equal grossScore
+  if (ep.holeScores && ep.holeScores.length > 0 && ep.grossScore > 0) {
+    var sum = ep.holeScores.reduce(function(a, b) { return a + b; }, 0);
+    if (sum !== ep.grossScore) {
+      html += '<div style="padding:10px 12px;background:rgba(239,140,52,0.12);border:1px solid rgba(239,140,52,0.4);margin-bottom:12px;font-family:Inter,sans-serif;font-size:12px;color:#ef8c34;">⚠️ Hulscores summer til ' + sum + ' men totalen er ' + ep.grossScore + ' — tjek scorekortet og ret evt. manuelt</div>';
+    }
+  }
 
   // Player name match selector
   html += '<div style="margin-bottom:14px;">';

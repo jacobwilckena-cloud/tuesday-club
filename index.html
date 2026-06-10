@@ -3040,7 +3040,10 @@ function ocrRenderReview() {
   // Player name match selector
   html += '<div style="margin-bottom:14px;">';
   html += '<div style="font-family:\'Crimson Text\',serif;font-size:19px;color:#EFE7D2;margin-bottom:4px;">' + ep.name + '</div>';
-  html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:10px;">' + ep.stableford + ' pts' + (ep.grossScore > 0 ? ' · ' + ep.grossScore + ' slag' : '') + '</div>';
+  html += '<div id="ocrReviewTotalsLine" style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:10px;display:flex;align-items:center;gap:6px;">';
+  html += '<input type="number" id="ocrReviewPts" min="0" max="72" value="' + ep.stableford + '" style="width:48px;padding:3px 6px;background:#0A0F0C;border:1px solid rgba(201,176,113,0.4);color:#C9B071;font-size:13px;text-align:center;font-weight:600;"> pts';
+  html += '<span id="ocrReviewGross">' + (ep.grossScore > 0 ? ' · ' + ep.grossScore + ' slag' : '') + '</span>';
+  html += '</div>';
   html += '<div style="font-family:Inter,sans-serif;font-size:9px;color:#C9B071;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">MATCH TIL SPILLER</div>';
   html += '<select id="ocrReviewMatchSelect" style="width:100%;background:#1F1C17;color:#EFE7D2;border:1px solid rgba(201,176,113,0.3);padding:10px;font-size:14px;">';
   html += '<option value="">— Vælg spiller —</option>';
@@ -3073,23 +3076,13 @@ function ocrRenderReview() {
       html += '<tr><td style="padding:1px 2px;color:#B8AE95;font-size:9px;">Par</td>';
       for (var h = c; h < endIdx; h++) html += '<td style="padding:1px 0;text-align:center;color:#B8AE95;font-size:10px;">' + ep.holePars[h] + '</td>';
       html += '</tr>';
-      // Score with notation
+      // Score with notation — EDITABLE inputs (0 = streget hul)
       html += '<tr><td style="padding:4px 2px;color:#B8AE95;font-size:9px;">Score</td>';
       for (var h = c; h < endIdx; h++) {
-        var s = ep.holeScores[h], p = ep.holePars[h];
-        if (!s || s === 0) {
-          html += '<td style="padding:4px 0;text-align:center;"><span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;font-size:11px;color:#B8AE95;">–</span></td>';
-          continue;
-        }
-        var d = s - p;
-        var ns = 'display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;font-size:11px;font-weight:600;box-sizing:border-box;';
-        if      (d <= -2) ns += 'border-radius:50%;border:1px solid #C9B071;outline:1px solid #C9B071;outline-offset:1px;color:#C9B071;';
-        else if (d === -1) ns += 'border-radius:50%;border:1px solid #ef4444;color:#ef4444;';
-        else if (d === 0)  ns += 'color:#EFE7D2;';
-        else if (d === 1)  ns += 'border:1px solid #B8AE95;color:#B8AE95;';
-        else if (d === 2)  ns += 'border:1px solid #ef8c34;outline:1px solid #ef8c34;outline-offset:1px;color:#ef8c34;';
-        else               ns += 'border:1px solid #ef4444;outline:1px solid #ef4444;outline-offset:1px;color:#ef4444;';
-        html += '<td style="padding:4px 0;text-align:center;"><span style="' + ns + '">' + s + '</span></td>';
+        var s = ep.holeScores[h];
+        html += '<td style="padding:4px 1px;text-align:center;">';
+        html += '<input type="number" inputmode="numeric" min="0" max="15" id="ocrh-' + h + '" value="' + (s || 0) + '" onchange="ocrHoleEdited(' + h + ', this)" style="' + ocrHoleInputStyle(s, ep.holePars[h]) + '">';
+        html += '</td>';
       }
       html += '</tr>';
       // Points row if available
@@ -3109,14 +3102,57 @@ function ocrRenderReview() {
 
 var ocrEditIndex = null; // null = reviewing a new scan; number = editing queue[i]
 
+// Notation styling for editable hole inputs in review
+function ocrHoleInputStyle(s, p) {
+  var base = 'width:100%;max-width:30px;padding:6px 0;background:#0A0F0C;font-size:12px;font-weight:600;text-align:center;box-sizing:border-box;border-radius:3px;-moz-appearance:textfield;';
+  if (!s || s === 0) return base + 'border:1px solid rgba(201,176,113,0.25);color:#B8AE95;';
+  var d = s - p;
+  if      (d <= -2) return base + 'border:2px solid #C9B071;border-radius:50%;color:#C9B071;';
+  else if (d === -1) return base + 'border:2px solid #ef4444;border-radius:50%;color:#ef4444;';
+  else if (d === 0)  return base + 'border:1px solid rgba(201,176,113,0.25);color:#EFE7D2;';
+  else if (d === 1)  return base + 'border:2px solid #B8AE95;color:#B8AE95;';
+  else               return base + 'border:2px solid #ef8c34;color:#ef8c34;';
+}
+
+function ocrHoleEdited(holeIdx, inputEl) {
+  var card = ocrCurrentCard;
+  if (!card || !card.ep.holeScores) return;
+  var ep = card.ep;
+  var v = parseInt(inputEl.value);
+  ep.holeScores[holeIdx] = isNaN(v) || v < 0 ? 0 : v;
+  inputEl.value = ep.holeScores[holeIdx];
+
+  // Restyle this cell
+  inputEl.style.cssText = ocrHoleInputStyle(ep.holeScores[holeIdx], ep.holePars[holeIdx]);
+
+  // Recompute: dashed status, gross, birdies
+  var dashed = ep.holeScores.some(function(s) { return !s || s === 0; });
+  ep.hasDashedHoles = dashed;
+  var gross = 0, birdies = 0;
+  ep.holeScores.forEach(function(s, i) {
+    if (!s || s === 0) return;
+    gross += s;
+    if (s < ep.holePars[i]) birdies++;
+  });
+  ep.grossScore = dashed ? 0 : gross;
+
+  // Update UI: gross line + birdies field
+  var grossEl = document.getElementById('ocrReviewGross');
+  if (grossEl) grossEl.textContent = ep.grossScore > 0 ? ' · ' + ep.grossScore + ' slag' : ' · — slag (streget)';
+  var birdiesEl = document.getElementById('ocrReviewBirdies');
+  if (birdiesEl) birdiesEl.value = birdies;
+}
+
 function ocrApproveCard() {
   var card = ocrCurrentCard;
   if (!card) return;
   // Read current values from UI
   var sel = document.getElementById('ocrReviewMatchSelect');
   var birdiesEl = document.getElementById('ocrReviewBirdies');
+  var ptsEl = document.getElementById('ocrReviewPts');
   card.matchId = sel ? (parseInt(sel.value) || null) : card.matchId;
   card.birdies = birdiesEl ? (parseInt(birdiesEl.value) || 0) : card.birdies;
+  if (ptsEl) card.ep.stableford = parseInt(ptsEl.value) || 0;
 
   if (!card.matchId) { ocrShowError('Vælg en spiller inden godkendelse'); return; }
 

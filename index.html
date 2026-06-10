@@ -1643,6 +1643,52 @@ function switchLeaderboardTab(boardType) {
   tab9.style.borderBottomColor = boardType === '9h' ? '#C9B071' : 'transparent';
 }
 
+// Shared compact hole-grid (9 holes per row) used in Runder expansion
+function buildScoreGridHTML(holeScores, holePars, startHole) {
+  if (!holeScores || holeScores.length === 0 || !holePars || holePars.length === 0) {
+    return '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;font-style:italic;padding:6px 0;">Ingen huldata for denne runde</div>';
+  }
+  var base = startHole || 1;
+  var html = '';
+  for (var c = 0; c < holeScores.length; c += 9) {
+    var endIdx = Math.min(c + 9, holeScores.length);
+    html += '<table style="border-collapse:collapse;table-layout:fixed;font-family:Inter,sans-serif;width:100%;margin-bottom:6px;">';
+    html += '<colgroup><col style="width:34px;">';
+    for (var h = c; h < endIdx; h++) html += '<col>';
+    html += '</colgroup>';
+    html += '<tr><td style="padding:1px 2px;color:#B8AE95;font-size:9px;">Hul</td>';
+    for (var h = c; h < endIdx; h++) html += '<td style="padding:1px 0;text-align:center;color:#B8AE95;font-size:9px;">' + (base + h) + '</td>';
+    html += '</tr>';
+    html += '<tr><td style="padding:1px 2px;color:#B8AE95;font-size:9px;">Par</td>';
+    for (var h = c; h < endIdx; h++) html += '<td style="padding:1px 0;text-align:center;color:#B8AE95;font-size:10px;">' + holePars[h] + '</td>';
+    html += '</tr>';
+    html += '<tr><td style="padding:4px 2px;color:#B8AE95;font-size:9px;">Score</td>';
+    for (var h = c; h < endIdx; h++) {
+      var s = holeScores[h], p = holePars[h];
+      if (!s || s === 0) {
+        html += '<td style="padding:4px 0;text-align:center;"><span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;font-size:11px;color:#B8AE95;">–</span></td>';
+        continue;
+      }
+      var d = s - p;
+      var ns = 'display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;font-size:11px;font-weight:600;box-sizing:border-box;';
+      if      (d <= -2) ns += 'border-radius:50%;border:1px solid #C9B071;outline:1px solid #C9B071;outline-offset:1px;color:#C9B071;';
+      else if (d === -1) ns += 'border-radius:50%;border:1px solid #ef4444;color:#ef4444;';
+      else if (d === 0)  ns += 'color:#EFE7D2;';
+      else if (d === 1)  ns += 'border:1px solid #B8AE95;color:#B8AE95;';
+      else if (d === 2)  ns += 'border:1px solid #ef8c34;outline:1px solid #ef8c34;outline-offset:1px;color:#ef8c34;';
+      else               ns += 'border:1px solid #ef4444;outline:1px solid #ef4444;outline-offset:1px;color:#ef4444;';
+      html += '<td style="padding:4px 0;text-align:center;"><span style="' + ns + '">' + s + '</span></td>';
+    }
+    html += '</tr></table>';
+  }
+  return html;
+}
+
+function toggleRoundScorecard(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.toggle('hidden');
+}
+
 function renderRounds() {
   var html = '<div class="rounds-list">';
 
@@ -1665,10 +1711,13 @@ function renderRounds() {
         var player = players.find(function(p) { return p.id === pid; });
         var score = (round.scores && round.scores[pid]) || {};
         groups[key].entries.push({
+          pid: pid,
           name: player ? player.name : 'Spiller ' + pid,
           stableford: score.stableford || 0,
           grossScore: score.grossScore || 0,
-          birdies: score.birdies || 0
+          birdies: score.birdies || 0,
+          holeScores: score.holeScores || [],
+          holePars: score.holePars || []
         });
       });
     });
@@ -1688,16 +1737,26 @@ function renderRounds() {
         '</div>';
 
       g.entries.forEach(function(e, idx) {
-        html += '<div style="display:flex;align-items:baseline;justify-content:space-between;padding:8px 0;' + (idx > 0 ? 'border-top:1px solid rgba(201,176,113,0.12);' : 'margin-top:8px;') + '">';
+        var cardId = 'roundsc-' + key.replace(/[^a-zA-Z0-9]/g, '') + '-' + e.pid;
+        var hasGrid = e.holeScores && e.holeScores.length > 0;
+        var startHole = (g.holes === 'Bag9') ? 10 : 1;
+
+        html += '<div onclick="toggleRoundScorecard(\'' + cardId + '\')" style="display:flex;align-items:baseline;justify-content:space-between;padding:8px 0;cursor:pointer;' + (idx > 0 ? 'border-top:1px solid rgba(201,176,113,0.12);' : 'margin-top:8px;') + '">';
         html += '<div style="display:flex;align-items:baseline;gap:10px;">';
         html += '<span style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;min-width:18px;">' + (idx + 1) + '.</span>';
         html += '<span style="font-family:\'Crimson Text\',serif;font-size:17px;color:#EFE7D2;">' + e.name + '</span>';
+        if (hasGrid) html += '<span style="font-size:10px;color:#B8AE95;">▾</span>';
         html += '</div>';
         html += '<div style="font-family:Inter,sans-serif;font-size:12px;color:#C9B071;white-space:nowrap;">';
         html += '<strong>' + e.stableford + ' pts</strong>';
         if (e.grossScore > 0) html += ' <span style="color:#B8AE95;">· ' + e.grossScore + ' slag</span>';
         if (e.birdies > 0) html += ' <span style="color:#B8AE95;">· 🐦 ' + e.birdies + '</span>';
         html += '</div>';
+        html += '</div>';
+
+        // Expandable scorecard
+        html += '<div id="' + cardId + '" class="hidden" style="padding:4px 0 10px 0;">';
+        html += buildScoreGridHTML(e.holeScores, e.holePars, startHole);
         html += '</div>';
       });
 

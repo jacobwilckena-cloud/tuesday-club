@@ -2892,44 +2892,50 @@ function ocrRenderReview() {
   html += '<input type="number" id="ocrReviewBirdies" min="0" max="9" value="' + card.birdies + '" style="width:56px;padding:5px 8px;background:#0A0F0C;border:1px solid rgba(201,176,113,0.4);color:#EFE7D2;font-size:16px;text-align:center;">';
   html += '</div>';
 
-  // Scorecard grid
+  // Scorecard grid — rows of 9 holes, table-layout:fixed so all 9 always fit on screen
   if (ep.holeScores && ep.holeScores.length > 0 && ep.holePars && ep.holePars.length > 0) {
-    html += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:4px;">';
-    html += '<table style="border-collapse:collapse;font-family:Inter,sans-serif;font-size:12px;width:100%;">';
-    // Hole numbers
-    html += '<tr><td style="padding:2px 5px;color:#B8AE95;font-size:9px;white-space:nowrap;">Hul</td>';
-    for (var h = 0; h < ep.holeScores.length; h++) html += '<td style="padding:2px 3px;text-align:center;color:#B8AE95;font-size:10px;">' + (h+1) + '</td>';
-    html += '</tr>';
-    // Par
-    html += '<tr><td style="padding:2px 5px;color:#B8AE95;font-size:9px;">Par</td>';
-    for (var h = 0; h < ep.holePars.length; h++) html += '<td style="padding:2px 3px;text-align:center;color:#B8AE95;">' + ep.holePars[h] + '</td>';
-    html += '</tr>';
-    // Score with notation
-    html += '<tr><td style="padding:3px 5px;color:#B8AE95;font-size:9px;">Score</td>';
-    for (var h = 0; h < ep.holeScores.length; h++) {
-      var s = ep.holeScores[h], p = ep.holePars[h];
-      if (!s || s === 0) {
-        html += '<td style="padding:2px 2px;text-align:center;"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:12px;color:#B8AE95;">–</span></td>';
-        continue;
-      }
-      var d = s - p;
-      var ns = 'display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:12px;font-weight:600;';
-      if      (d <= -2) ns += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
-      else if (d === -1) ns += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';
-      else if (d === 0)  ns += 'color:#EFE7D2;';
-      else if (d === 1)  ns += 'border:2px solid #B8AE95;color:#B8AE95;';
-      else if (d === 2)  ns += 'border:2px solid #ef8c34;outline:2px solid #ef8c34;outline-offset:2px;color:#ef8c34;';
-      else               ns += 'border:2px solid #ef4444;outline:2px solid #ef4444;outline-offset:2px;color:#ef4444;';
-      html += '<td style="padding:2px 2px;text-align:center;"><span style="' + ns + '">' + s + '</span></td>';
-    }
-    html += '</tr>';
-    // Points row if available
-    if (ep.holePoints && ep.holePoints.length > 0) {
-      html += '<tr><td style="padding:2px 5px;color:#B8AE95;font-size:9px;">Pts</td>';
-      for (var h = 0; h < ep.holePoints.length; h++) html += '<td style="padding:2px 3px;text-align:center;color:#C9B071;font-size:10px;">' + ep.holePoints[h] + '</td>';
+    var chunkSize = 9;
+    for (var c = 0; c < ep.holeScores.length; c += chunkSize) {
+      var endIdx = Math.min(c + chunkSize, ep.holeScores.length);
+      html += '<table style="border-collapse:collapse;table-layout:fixed;font-family:Inter,sans-serif;width:100%;margin-bottom:' + (endIdx < ep.holeScores.length ? '10px' : '4px') + ';">';
+      html += '<colgroup><col style="width:34px;">';
+      for (var h = c; h < endIdx; h++) html += '<col>';
+      html += '</colgroup>';
+      // Hole numbers
+      html += '<tr><td style="padding:1px 2px;color:#B8AE95;font-size:9px;">Hul</td>';
+      for (var h = c; h < endIdx; h++) html += '<td style="padding:1px 0;text-align:center;color:#B8AE95;font-size:9px;">' + (h+1) + '</td>';
       html += '</tr>';
+      // Par
+      html += '<tr><td style="padding:1px 2px;color:#B8AE95;font-size:9px;">Par</td>';
+      for (var h = c; h < endIdx; h++) html += '<td style="padding:1px 0;text-align:center;color:#B8AE95;font-size:10px;">' + ep.holePars[h] + '</td>';
+      html += '</tr>';
+      // Score with notation
+      html += '<tr><td style="padding:4px 2px;color:#B8AE95;font-size:9px;">Score</td>';
+      for (var h = c; h < endIdx; h++) {
+        var s = ep.holeScores[h], p = ep.holePars[h];
+        if (!s || s === 0) {
+          html += '<td style="padding:4px 0;text-align:center;"><span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;font-size:11px;color:#B8AE95;">–</span></td>';
+          continue;
+        }
+        var d = s - p;
+        var ns = 'display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;font-size:11px;font-weight:600;box-sizing:border-box;';
+        if      (d <= -2) ns += 'border-radius:50%;border:1px solid #C9B071;outline:1px solid #C9B071;outline-offset:1px;color:#C9B071;';
+        else if (d === -1) ns += 'border-radius:50%;border:1px solid #ef4444;color:#ef4444;';
+        else if (d === 0)  ns += 'color:#EFE7D2;';
+        else if (d === 1)  ns += 'border:1px solid #B8AE95;color:#B8AE95;';
+        else if (d === 2)  ns += 'border:1px solid #ef8c34;outline:1px solid #ef8c34;outline-offset:1px;color:#ef8c34;';
+        else               ns += 'border:1px solid #ef4444;outline:1px solid #ef4444;outline-offset:1px;color:#ef4444;';
+        html += '<td style="padding:4px 0;text-align:center;"><span style="' + ns + '">' + s + '</span></td>';
+      }
+      html += '</tr>';
+      // Points row if available
+      if (ep.holePoints && ep.holePoints.length >= endIdx) {
+        html += '<tr><td style="padding:1px 2px;color:#B8AE95;font-size:9px;">Pts</td>';
+        for (var h = c; h < endIdx; h++) html += '<td style="padding:1px 0;text-align:center;color:#C9B071;font-size:10px;">' + ep.holePoints[h] + '</td>';
+        html += '</tr>';
+      }
+      html += '</table>';
     }
-    html += '</table></div>';
   } else {
     html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;font-style:italic;padding:8px 0;">Ingen huldata — kun totaler gemt</div>';
   }
@@ -3010,24 +3016,27 @@ function ocrRenderQueue() {
     html += '</div>';
     // Mini scorecard
     if (ep.holeScores && ep.holeScores.length > 0 && ep.holePars) {
-      html += '<div style="display:flex;gap:3px;margin-top:6px;flex-wrap:wrap;">';
-      for (var h = 0; h < ep.holeScores.length; h++) {
-        var s = ep.holeScores[h], p = ep.holePars[h];
-        if (!s || s === 0) {
-          html += '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:10px;color:#B8AE95;">–</span>';
-          continue;
+      for (var rc = 0; rc < ep.holeScores.length; rc += 9) {
+        var rEnd = Math.min(rc + 9, ep.holeScores.length);
+        html += '<div style="display:flex;gap:4px;margin-top:6px;">';
+        for (var h = rc; h < rEnd; h++) {
+          var s = ep.holeScores[h], p = ep.holePars[h];
+          if (!s || s === 0) {
+            html += '<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;font-size:10px;color:#B8AE95;">–</span>';
+            continue;
+          }
+          var d = s - p;
+          var ns = 'display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;font-size:10px;font-weight:600;box-sizing:border-box;';
+          if      (d <= -2) ns += 'border-radius:50%;border:1px solid #C9B071;outline:1px solid #C9B071;outline-offset:1px;color:#C9B071;';
+          else if (d === -1) ns += 'border-radius:50%;border:1px solid #ef4444;color:#ef4444;';
+          else if (d === 0)  ns += 'color:#EFE7D2;';
+          else if (d === 1)  ns += 'border:1px solid #B8AE95;color:#B8AE95;';
+          else if (d === 2)  ns += 'border:1px solid #ef8c34;outline:1px solid #ef8c34;outline-offset:1px;color:#ef8c34;';
+          else               ns += 'border:1px solid #ef4444;outline:1px solid #ef4444;outline-offset:1px;color:#ef4444;';
+          html += '<span style="' + ns + '">' + s + '</span>';
         }
-        var d = s - p;
-        var ns = 'display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:10px;font-weight:600;';
-        if      (d <= -2) ns += 'border-radius:50%;border:2px solid #C9B071;outline:2px solid #C9B071;outline-offset:2px;color:#C9B071;';
-        else if (d === -1) ns += 'border-radius:50%;border:2px solid #ef4444;color:#ef4444;';
-        else if (d === 0)  ns += 'color:#EFE7D2;';
-        else if (d === 1)  ns += 'border:2px solid #B8AE95;color:#B8AE95;';
-        else if (d === 2)  ns += 'border:2px solid #ef8c34;outline:2px solid #ef8c34;outline-offset:2px;color:#ef8c34;';
-        else               ns += 'border:2px solid #ef4444;outline:2px solid #ef4444;outline-offset:2px;color:#ef4444;';
-        html += '<span style="' + ns + '">' + s + '</span>';
+        html += '</div>';
       }
-      html += '</div>';
     }
     html += '</div>';
     html += '<button type="button" onclick="ocrRemoveFromQueue(' + idx + ', event)" style="background:none;border:none;color:#ff6666;font-size:20px;cursor:pointer;padding:4px 8px;flex-shrink:0;">✕</button>';

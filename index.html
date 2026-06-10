@@ -828,7 +828,12 @@ body {
     </div>
     
     <div id="multiplayerFormContainer" class="hidden"></div>
-    
+
+    <div style="text-align:center;margin-bottom:8px;">
+      <button type="button" onclick="toggleManualEntry()" id="manualEntryToggle" style="background:none;border:none;color:#B8AE95;font-family:Inter,sans-serif;font-size:11px;letter-spacing:1px;cursor:pointer;text-decoration:underline;padding:8px;">✏️ Indtast manuelt i stedet</button>
+    </div>
+
+    <div id="manualEntrySection" class="hidden">
     <form id="addRoundForm">
       <div class="form-group">
         <label for="roundDate">Dato</label>
@@ -885,6 +890,7 @@ body {
         <button type="submit" class="btn-primary">Gem Runde</button>
       </div>
     </form>
+    </div>
   </div>
 </div>
 
@@ -3051,8 +3057,20 @@ function ocrResetAll() {
 function renderAddRoundModal() {}
 function cancelOcr() { ocrResetAll(); }
 
+function toggleManualEntry() {
+  var section = document.getElementById('manualEntrySection');
+  var toggle = document.getElementById('manualEntryToggle');
+  var isHidden = section.classList.contains('hidden');
+  section.classList.toggle('hidden');
+  toggle.textContent = isHidden ? '▲ Skjul manuel indtastning' : '✏️ Indtast manuelt i stedet';
+}
+
 function closeAddRoundModal() {
   document.getElementById('addRoundModal').classList.add('hidden');
+  var manualSection = document.getElementById('manualEntrySection');
+  var manualToggle = document.getElementById('manualEntryToggle');
+  if (manualSection) manualSection.classList.add('hidden');
+  if (manualToggle) manualToggle.textContent = '✏️ Indtast manuelt i stedet';
   var errorDiv = document.getElementById('addRoundError');
   var successDiv = document.getElementById('addRoundSuccess');
   if (errorDiv) errorDiv.classList.add('hidden');

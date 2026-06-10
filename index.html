@@ -2705,6 +2705,36 @@ function getGeminiModel() {
     });
 }
 
+// Call Gemini with auto-retry on 503/overload and model fallback.
+// attempt 1: preferred model · attempt 2: same model after 2s · attempt 3: fallback model (flash-lite) after 3s
+function geminiGenerate(body) {
+  var fallbacks = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+  function callModel(model) {
+    return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(r) { return r.json(); });
+  }
+  function isOverloaded(data) {
+    return data.error && (data.error.code === 503 || /high demand|overloaded|unavailable/i.test(data.error.message || ''));
+  }
+  function wait(ms) { return new Promise(function(res) { setTimeout(res, ms); }); }
+
+  return getGeminiModel().then(function(model) {
+    return callModel(model).then(function(data) {
+      if (!isOverloaded(data)) return data;
+      // Retry same model after 2s
+      return wait(2000).then(function() { return callModel(model); }).then(function(data2) {
+        if (!isOverloaded(data2)) return data2;
+        // Try fallback model after 3s
+        var fb = fallbacks[0] !== model ? fallbacks[0] : fallbacks[1];
+        return wait(3000).then(function() { return callModel(fb); });
+      });
+    });
+  });
+}
+
 function ocrHandleUpload(event) {
   var file = event.target.files && event.target.files[0];
   event.target.value = '';
@@ -2722,20 +2752,16 @@ function ocrHandleUpload(event) {
 
   compressImage(file)
     .then(function(img) {
-      return getGeminiModel().then(function(model) {
-        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: img } }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
-          })
-        });
+      return geminiGenerate({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: img } }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
       });
     })
-    .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.error) {
+        if (data.error.code === 503 || /high demand|overloaded|unavailable/i.test(data.error.message || '')) {
+          throw new Error('Gemini er overbelastet lige nu (prøvede 3 gange). Vent et minut og prøv igen.');
+        }
         if (data.error.code === 429 || /quota|rate/i.test(data.error.message || '')) {
           var retry = (data.error.message || '').match(/retry in ([\d.]+)/i);
           throw new Error('Gemini-kvota opbrugt. ' + (retry ? 'Prøv igen om ' + Math.ceil(parseFloat(retry[1])) + ' sek.' : 'Vent lidt og prøv igen.'));

@@ -813,6 +813,17 @@ body {
       <div id="ocrStep_queue" class="hidden" style="border: 1px solid rgba(201,176,113,0.3); padding: 20px; margin-bottom: 24px; background: rgba(201,176,113,0.05);">
         <div id="ocrQueueHeader" style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 12px;">KLAR TIL AT GEMME</div>
         <div id="ocrQueueList"></div>
+
+        <!-- Editable round date -->
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(201,176,113,0.15);">
+          <div style="font-family:Inter,sans-serif;font-size:9px;color:#C9B071;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">📅 Dato for runden</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <select id="ocrQueueDay" onchange="ocrSyncQueueDate()" style="background:#1a1713;color:#EFE7D2;border:1px solid rgba(201,176,113,0.3);padding:10px 8px;font-size:15px;border-radius:4px;"></select>
+            <select id="ocrQueueMonth" onchange="ocrSyncQueueDate()" style="background:#1a1713;color:#EFE7D2;border:1px solid rgba(201,176,113,0.3);padding:10px 8px;font-size:15px;border-radius:4px;"></select>
+            <select id="ocrQueueYear" onchange="ocrSyncQueueDate()" style="background:#1a1713;color:#EFE7D2;border:1px solid rgba(201,176,113,0.3);padding:10px 8px;font-size:15px;border-radius:4px;"></select>
+          </div>
+        </div>
+
         <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
           <label for="ocrAddCardInput" class="btn-secondary" style="flex:1;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;">📸 Tilføj scorecard</label>
           <input type="file" id="ocrAddCardInput" accept="image/*" style="display:none" onchange="ocrHandleUpload(event)">
@@ -3153,7 +3164,28 @@ function ocrRemoveFromQueue(idx, ev) {
   if (ocrQueue.length === 0) ocrShowStep('idle');
 }
 
+function ocrSyncQueueDate() {
+  // Write queue date selects back to the hidden form fields used by saveRound
+  var d = document.getElementById('ocrQueueDay');
+  var m = document.getElementById('ocrQueueMonth');
+  var y = document.getElementById('ocrQueueYear');
+  if (d) document.getElementById('roundDay').value = d.value;
+  if (m) document.getElementById('roundMonth').value = m.value;
+  if (y) document.getElementById('roundYear').value = y.value;
+  updateRoundDate();
+}
+
+function ocrPopulateQueueDate() {
+  // Mirror the hidden date selects (options + current value) into the queue step
+  [['ocrQueueDay','roundDay'], ['ocrQueueMonth','roundMonth'], ['ocrQueueYear','roundYear']].forEach(function(pair) {
+    var dst = document.getElementById(pair[0]);
+    var src = document.getElementById(pair[1]);
+    if (dst && src) { dst.innerHTML = src.innerHTML; dst.value = src.value; }
+  });
+}
+
 function ocrRenderQueue() {
+  ocrPopulateQueueDate();
   var el = document.getElementById('ocrQueueList');
   if (!el) return;
   var qh = document.getElementById('ocrQueueHeader');

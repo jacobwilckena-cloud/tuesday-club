@@ -4004,11 +4004,15 @@ function handleEditPlayer(event) {
       joined: document.getElementById('editPlayerJoined').value
     })
     .eq('id', playerId)
+    .select()
     .then(function(result) {
-      console.log('Update done');
+      console.log('Update done', result);
       if (result.error) {
         console.error('Has error:', result.error.message);
         throw new Error(result.error.message);
+      }
+      if (!result.data || result.data.length === 0) {
+        throw new Error('Opdateringen blev afvist af databasen (0 rækker ændret). Tjek RLS-policy for UPDATE på players-tabellen i Supabase.');
       }
       successDiv.textContent = 'Spiller opdateret! 🎉';
       successDiv.classList.remove('hidden');

@@ -583,6 +583,7 @@ body {
 
 /* ========== UTILITIES ========== */
 .text-right { text-align: right; }
+.show-mobile { display: none; }
 .text-center { text-align: center; }
 .mb-1 { margin-bottom: 8px; }
 .mb-2 { margin-bottom: 16px; }
@@ -689,9 +690,10 @@ body {
   .leader-stats { text-align: left; }
   .leader-stats .score { font-size: 48px; }
   .standings-table { margin: 0 16px 40px; }
-  .standings-header { grid-template-columns: 40px 1fr 60px; }
+  .standings-header { grid-template-columns: 40px 1fr 64px; }
+  .show-mobile { display: inline; }
   .standings-header .hide-mobile { display: none; }
-  .standings-row { grid-template-columns: 40px 1fr 60px; }
+  .standings-row { grid-template-columns: 40px 1fr 64px; }
   .standings-row .hide-mobile { display: none; }
   .rounds-list, .course-info { padding: 0 16px 40px; }
   .form-row { grid-template-columns: 1fr; }
@@ -1572,7 +1574,7 @@ function renderLeaderboard() {
       '<div class="standings-header">' +
       '<div>No.</div>' +
       '<div>Member</div>' +
-      '<div class="text-right">Gennemsnit</div>' +
+      '<div class="text-right"><span class="hide-mobile">Gennemsnit</span><span class="show-mobile">Snit</span></div>' +
       '<div class="text-right hide-mobile">Best of</div>' +
       '<div class="text-right hide-mobile">Runder</div>' +
       '<div class="text-right hide-mobile">Birdies</div>' +

@@ -2904,6 +2904,25 @@ function ocrHandleUpload(event) {
         if (sc > bestScore && sc >= 10) { bestScore = sc; bestMatch = p; }
       });
 
+      // 18-hole card where one entire nine is dashed → reclassify as For9/Bag9 and trim
+      if (ep.holeScores && ep.holeScores.length === 18 && ep.holePars && ep.holePars.length === 18) {
+        var frontPlayed = ep.holeScores.slice(0, 9).some(function(s) { return s > 0; });
+        var backPlayed  = ep.holeScores.slice(9).some(function(s) { return s > 0; });
+        if (frontPlayed && !backPlayed) {
+          ep.holeScores = ep.holeScores.slice(0, 9);
+          ep.holePars   = ep.holePars.slice(0, 9);
+          if (ep.holePoints) ep.holePoints = ep.holePoints.slice(0, 9);
+          result.holes = 'For9';
+          document.getElementById('roundHoles').value = 'For9';
+        } else if (backPlayed && !frontPlayed) {
+          ep.holeScores = ep.holeScores.slice(9);
+          ep.holePars   = ep.holePars.slice(9);
+          if (ep.holePoints) ep.holePoints = ep.holePoints.slice(9);
+          result.holes = 'Bag9';
+          document.getElementById('roundHoles').value = 'Bag9';
+        }
+      }
+
       // Dashed holes (score 0) = picked up → gross total is invalid, keep only stableford
       var hasDashedHoles = false;
       if (ep.holeScores && ep.holeScores.length > 0) {
@@ -4271,9 +4290,12 @@ function deleteRound(roundId, roundDate) {
     return;
   }
   
-  supabase.from('rounds').delete().eq('id', roundId)
+  supabase.from('rounds').delete().eq('id', roundId).select()
     .then(function(result) {
       if (result.error) throw result.error;
+      if (!result.data || result.data.length === 0) {
+        throw new Error('Sletningen blev afvist af databasen (0 rækker). Der mangler sandsynligvis en DELETE-policy på rounds-tabellen i Supabase.');
+      }
       return loadRounds();
     })
     .then(function() {

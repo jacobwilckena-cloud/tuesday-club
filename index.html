@@ -1594,7 +1594,7 @@ function renderLeaderboard() {
         photoHtml = '<div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(201,176,113,0.1); margin-right: 12px; display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 16px; color: #C9B071; border: 2px solid rgba(201,176,113,0.3);">' + player.name.charAt(0) + '</div>';
       }
       
-      boardHtml += '<div class="standings-row ' + isTop3 + '" onclick="openPlayerProfile(' + player.id + ')" style="cursor: pointer;">' +
+      boardHtml += '<div class="standings-row ' + isTop3 + '" onclick="goToMemberCard(' + player.id + ')" style="cursor: pointer;">' +
         '<div class="rank">' + rank + '</div>' +
         '<div style="display: flex; align-items: center;">' +
         photoHtml +
@@ -1851,7 +1851,7 @@ function renderMembers() {
       photoHtml = '<div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(201,176,113,0.1); margin-right: 16px; display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 24px; color: #C9B071; border: 3px solid rgba(201,176,113,0.3);">' + player.name.charAt(0) + '</div>';
     }
     
-    html += '<div class="round-card">' +
+    html += '<div class="round-card" id="member-card-' + player.id + '">' +
       '<div style="display: flex; align-items: center; margin-bottom: 16px;">' +
       photoHtml +
       '<div>' +
@@ -2661,6 +2661,22 @@ function handleLogout() {
   document.getElementById('adminBtn').style.display = 'none';
   document.getElementById('mainApp').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+function goToMemberCard(playerId) {
+  currentTab = 'members';
+  renderNavTabs();
+  renderContent();
+  // Wait for render, then scroll to the player's card and highlight it briefly
+  setTimeout(function() {
+    var card = document.getElementById('member-card-' + playerId);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      card.style.transition = 'box-shadow 0.4s';
+      card.style.boxShadow = '0 0 0 2px rgba(201,176,113,0.6)';
+      setTimeout(function() { card.style.boxShadow = 'none'; }, 1800);
+    }
+  }, 80);
 }
 
 function switchTab(tab) {

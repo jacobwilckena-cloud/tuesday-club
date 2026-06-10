@@ -3970,11 +3970,17 @@ function closeEditPlayerModal() {
 
 function handleEditPlayer(event) {
   event.preventDefault();
-  
+
   var errorDiv = document.getElementById('editPlayerError');
   var successDiv = document.getElementById('editPlayerSuccess');
   errorDiv.classList.add('hidden');
   successDiv.classList.add('hidden');
+
+  // Visible progress so we know the handler runs at all
+  successDiv.textContent = '⏳ Gemmer...';
+  successDiv.classList.remove('hidden');
+
+  try {
   
   if (!supabase) {
     errorDiv.textContent = 'Database ikke tilgængelig';
@@ -4025,9 +4031,15 @@ function handleEditPlayer(event) {
     })
     .catch(function(error) {
       console.error('Caught:', error.message);
+      successDiv.classList.add('hidden');
       errorDiv.textContent = 'Fejl: ' + error.message;
       errorDiv.classList.remove('hidden');
     });
+  } catch (e) {
+    successDiv.classList.add('hidden');
+    errorDiv.textContent = 'Uventet fejl: ' + e.message;
+    errorDiv.classList.remove('hidden');
+  }
 }
 
 function deletePlayer(playerId, playerName) {

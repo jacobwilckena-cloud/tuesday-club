@@ -1291,6 +1291,12 @@ function getBestOfN(numRounds) {
   return 8; // 8+
 }
 
+// Format handicap for display: negative (plus-handicap) shows as "+2.2", normal as "13.7"
+function formatHcp(h) {
+  if (h === null || h === undefined || isNaN(h)) return '—';
+  return h < 0 ? '+' + Math.abs(h).toFixed(1) : h.toFixed(1);
+}
+
 // Merge fragmented round rows (one per player) into virtual rounds per date+holes.
 // Needed because rounds were historically saved as separate rows per player.
 function getGroupedRounds() {
@@ -1572,7 +1578,7 @@ function renderLeaderboard() {
         '<div class="leader-info">' +
         '<h3>' + label + ' · Leader</h3>' +
         '<h2>' + leader.name + '</h2>' +
-        '<p>' + leader.club + ' · HCP ' + leader.handicap.toFixed(1) + '</p>' +
+        '<p>' + leader.club + ' · HCP ' + formatHcp(leader.handicap) + '</p>' +
         '</div>' +
         '<div class="leader-stats">' +
         '<h3>Gennemsnit</h3>' +
@@ -1614,7 +1620,7 @@ function renderLeaderboard() {
         photoHtml +
         '<div>' +
         '<div class="name">' + player.name + '</div>' +
-        '<div class="club-info">' + player.club + ' · HCP ' + player.handicap.toFixed(1) + '</div>' +
+        '<div class="club-info">' + player.club + ' · HCP ' + formatHcp(player.handicap) + '</div>' +
         '</div>' +
         '</div>' +
         '<div class="score-value">' + (player.qualifyingAvg || '—') + '</div>' +
@@ -1871,7 +1877,7 @@ function renderMembers() {
       '<div>' +
       '<h3 style="font-size: 24px; color: #EFE7D2; margin-bottom: 4px;">' + player.name + '</h3>' +
       '<p style="color: #B8AE95; margin: 0;">' +
-      player.club + ' · HCP ' + player.handicap.toFixed(1) + ' · Medlem siden ' + player.joined +
+      player.club + ' · HCP ' + formatHcp(player.handicap) + ' · Medlem siden ' + player.joined +
       '</p>' +
       '</div>' +
       '</div>' +
@@ -2537,7 +2543,7 @@ function openPlayerProfile(playerId) {
   html += '<div>';
   html += '<h2 style="font-family: \'Crimson Text\', serif; font-size: 28px; color: #EFE7D2; margin: 0;">' + player.name + '</h2>';
   html += '<div style="font-family: Inter, sans-serif; font-size: 12px; color: #B8AE95; margin-top: 4px;">' + player.club + '</div>';
-  html += '<div style="font-family: Inter, sans-serif; font-size: 12px; color: #C9B071; margin-top: 2px;">HCP ' + player.handicap.toFixed(1) + ' · Medlem siden ' + (player.joined || '—') + '</div>';
+  html += '<div style="font-family: Inter, sans-serif; font-size: 12px; color: #C9B071; margin-top: 2px;">HCP ' + formatHcp(player.handicap) + ' · Medlem siden ' + (player.joined || '—') + '</div>';
   html += '</div>';
   html += '<button onclick="closePlayerProfile()" style="margin-left: auto; background: none; border: none; color: #B8AE95; font-size: 24px; cursor: pointer; padding: 4px; line-height: 1;">×</button>';
   html += '</div>';
@@ -3856,8 +3862,8 @@ function renderHandicapProposals() {
 
     // HCP change
     html += '<div style="text-align:center;flex-shrink:0;">';
-    html += '<div style="font-family:\'Crimson Text\',serif;font-size:20px;color:#B8AE95;text-decoration:line-through;">' + prop.player.handicap.toFixed(1) + '</div>';
-    html += '<div style="font-family:\'Crimson Text\',serif;font-size:22px;color:#EFE7D2;font-weight:600;">' + prop.newHandicap.toFixed(1) + '</div>';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:20px;color:#B8AE95;text-decoration:line-through;">' + formatHcp(prop.player.handicap) + '</div>';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:22px;color:#EFE7D2;font-weight:600;">' + formatHcp(prop.newHandicap) + '</div>';
     html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:' + diffColor + ';">' + diffStr + '</div>';
     html += '</div>';
 
@@ -3990,11 +3996,11 @@ function generatePlayerSummary(playerId) {
     .map(function(p) {
       var ps = getPlayerStats(p.id);
       var lbPos9 = lb9.findIndex(function(x){ return x.id === p.id; }) + 1;
-      return p.name + ' (HCP '+p.handicap.toFixed(1)+', snit '+ps.qualifyingAvg+', #'+lbPos9+' på 9h leaderboard)';
+      return p.name + ' (HCP '+formatHcp(p.handicap)+', snit '+ps.qualifyingAvg+', #'+lbPos9+' på 9h leaderboard)';
     }).join('; ');
 
   var context = 'Spiller: '+player.name+'\n'+
-    'HCP: '+player.handicap.toFixed(1)+'\n'+
+    'HCP: '+formatHcp(player.handicap)+'\n'+
     'Runder: '+stats.rounds+'\n'+
     (pos9>0?'Leaderboard position 9h: #'+pos9+'\n':'')+
     (pos18>0?'Leaderboard position 18h: #'+pos18+'\n':'')+
@@ -4248,7 +4254,7 @@ function renderAdminPlayers() {
       '<div style="display: flex; justify-content: space-between; align-items: center;">' +
       '<div>' +
       '<h3 style="font-size: 20px; color: #EFE7D2; margin-bottom: 6px;">' + p.name + '</h3>' +
-      '<p style="color: #B8AE95; font-size: 14px;">HCP ' + p.handicap + ' · ' + p.club + '</p>' +
+      '<p style="color: #B8AE95; font-size: 14px;">HCP ' + formatHcp(p.handicap) + ' · ' + p.club + '</p>' +
       '</div>' +
       '<div style="display: flex; gap: 8px;">' +
       '<button onclick="openEditPlayerModal(' + p.id + ')" class="btn-secondary btn-sm">Rediger</button>' +

@@ -1619,33 +1619,66 @@ function switchLeaderboardTab(boardType) {
 
 function renderRounds() {
   var html = '<div class="rounds-list">';
-  
+
   if (rounds.length === 0) {
     html += '<div class="empty-state">' +
       '<h3>Ingen runder endnu</h3>' +
       '<p>Klik på "Registrer Runde" for at tilføje den første runde</p>' +
       '</div>';
   } else {
-    for (var i = 0; i < rounds.length; i++) {
-      var round = rounds[i];
-      var date = new Date(round.date).toLocaleDateString('da-DK');
-      var playerNames = round.participants.map(function(pid) {
+    // Group rounds by date + holes
+    var groups = {};
+    var groupOrder = [];
+    rounds.forEach(function(round) {
+      var key = round.date + '|' + round.holes;
+      if (!groups[key]) {
+        groups[key] = { date: round.date, holes: round.holes, course: round.course, entries: [] };
+        groupOrder.push(key);
+      }
+      round.participants.forEach(function(pid) {
         var player = players.find(function(p) { return p.id === pid; });
-        return player ? player.name : 'Spiller ' + pid;
-      }).join(', ');
+        var score = (round.scores && round.scores[pid]) || {};
+        groups[key].entries.push({
+          name: player ? player.name : 'Spiller ' + pid,
+          stableford: score.stableford || 0,
+          grossScore: score.grossScore || 0,
+          birdies: score.birdies || 0
+        });
+      });
+    });
+
+    groupOrder.forEach(function(key) {
+      var g = groups[key];
+      var date = new Date(g.date).toLocaleDateString('da-DK');
+      // Sort players by points, best first
+      g.entries.sort(function(a, b) { return b.stableford - a.stableford; });
 
       html += '<div class="round-card">' +
         '<div class="round-header">' +
         '<div>' +
         '<div class="round-date">' + date + '</div>' +
-        '<div class="round-course">' + round.course + ' · ' + holesLabel(round.holes) + '</div>' +
+        '<div class="round-course">' + g.course + ' · ' + holesLabel(g.holes) + ' · ' + g.entries.length + ' spiller' + (g.entries.length !== 1 ? 'e' : '') + '</div>' +
         '</div>' +
-        '</div>' +
-        '<div class="round-players">' + playerNames + '</div>' +
         '</div>';
-    }
+
+      g.entries.forEach(function(e, idx) {
+        html += '<div style="display:flex;align-items:baseline;justify-content:space-between;padding:8px 0;' + (idx > 0 ? 'border-top:1px solid rgba(201,176,113,0.12);' : 'margin-top:8px;') + '">';
+        html += '<div style="display:flex;align-items:baseline;gap:10px;">';
+        html += '<span style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;min-width:18px;">' + (idx + 1) + '.</span>';
+        html += '<span style="font-family:\'Crimson Text\',serif;font-size:17px;color:#EFE7D2;">' + e.name + '</span>';
+        html += '</div>';
+        html += '<div style="font-family:Inter,sans-serif;font-size:12px;color:#C9B071;white-space:nowrap;">';
+        html += '<strong>' + e.stableford + ' pts</strong>';
+        if (e.grossScore > 0) html += ' <span style="color:#B8AE95;">· ' + e.grossScore + ' slag</span>';
+        if (e.birdies > 0) html += ' <span style="color:#B8AE95;">· 🐦 ' + e.birdies + '</span>';
+        html += '</div>';
+        html += '</div>';
+      });
+
+      html += '</div>';
+    });
   }
-  
+
   html += '</div>';
   return html;
 }

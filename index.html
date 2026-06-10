@@ -973,6 +973,13 @@ body {
         <button onclick="saveGeminiKey()" class="btn-secondary" style="font-size:12px;">Gem nøgle</button>
         <span id="geminiKeyStatus" style="font-size:12px;margin-left:12px;"></span>
       </div>
+      <div style="margin-bottom:24px; padding:16px; background:rgba(201,176,113,0.05); border:1px solid rgba(201,176,113,0.15);">
+        <h3 style="font-size:16px;color:#EFE7D2;margin-bottom:8px;">⚡ Groq API Nøgle (valgfri fallback)</h3>
+        <p style="color:#B8AE95;font-size:12px;margin-bottom:12px;">Bruges automatisk når Gemini-kvoten er opbrugt. Gratis nøgle på console.groq.com. Gemmes kun i din browser.</p>
+        <input type="text" id="groqKeyInput" placeholder="gsk_..." style="width:100%;padding:10px;background:#0A0F0C;border:1px solid rgba(201,176,113,0.3);color:#EFE7D2;font-size:13px;margin-bottom:8px;">
+        <button onclick="saveGroqKey()" class="btn-secondary" style="font-size:12px;">Gem nøgle</button>
+        <span id="groqKeyStatus" style="font-size:12px;margin-left:12px;"></span>
+      </div>
       <div style="margin-bottom: 24px;">
         <h3 style="font-size: 20px; color: #EFE7D2; margin-bottom: 8px;">📊 Opdater Handicap</h3>
         <p style="color: #B8AE95; font-size: 14px; margin-bottom: 16px;">Upload screenshot fra GolfBox/DGU handicapliste. Appen finder automatisk dine spillere og foreslår opdateringer.</p>
@@ -1151,6 +1158,7 @@ var SUPABASE_URL = "https://fhfzxfjzkcojbgrsbkgz.supabase.co";
 var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZnp4Zmp6a2NvamJncnNia2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNDI5NTAsImV4cCI6MjA5MjYxODk1MH0.k1o3ZUDt_bJae3tnBi3jKpowbtVmwdusDtOCm41tfyU";
 // NVIDIA key removed — all AI calls now use Gemini
 var GEMINI_API_KEY = localStorage.getItem('geminiKey') || "";
+var GROQ_API_KEY = localStorage.getItem('groqKey') || "";
 var LOGIN_PIN = "1234";
 var ADMIN_PIN = "2606";
 var currentPin = "";
@@ -2817,6 +2825,33 @@ function geminiGenerate(body) {
   }
   function wait(ms) { return new Promise(function(res) { setTimeout(res, ms); }); }
 
+  // Groq fallback: translate Gemini-format body → OpenAI-format, normalize response back
+  function callGroq() {
+    var parts = (body.contents && body.contents[0] && body.contents[0].parts) || [];
+    var textPart = parts.find(function(p) { return p.text; });
+    var imgPart = parts.find(function(p) { return p.inline_data; });
+    var groqContent = [];
+    if (textPart) groqContent.push({ type: 'text', text: textPart.text });
+    if (imgPart) groqContent.push({ type: 'image_url', image_url: { url: 'data:' + imgPart.inline_data.mime_type + ';base64,' + imgPart.inline_data.data } });
+    return fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: [{ role: 'user', content: groqContent }],
+        temperature: 0.1,
+        max_tokens: 2048
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(g) {
+      if (g.error) return { error: { code: g.error.code || 500, message: 'Groq: ' + (g.error.message || 'ukendt fejl') } };
+      var text = (g.choices && g.choices[0] && g.choices[0].message && g.choices[0].message.content) || '';
+      // Normalize to Gemini response shape so the caller code is unchanged
+      return { candidates: [{ content: { parts: [{ text: text }] } }], _provider: 'groq' };
+    });
+  }
+
   // Soft client-side throttle: min 7s between scans keeps us under ~10 req/min
   var now = Date.now();
   var sinceLast = now - _lastGeminiCall;
@@ -2827,11 +2862,22 @@ function geminiGenerate(body) {
     return getGeminiModel();
   }).then(function(model) {
     return callModel(model).then(function(data) {
-      if (!isOverloaded(data) || isRateLimited(data)) return data;
+      // Rate-limited → jump straight to Groq if available (don't burn Gemini quota)
+      if (isRateLimited(data)) {
+        return GROQ_API_KEY ? callGroq() : data;
+      }
+      if (!isOverloaded(data)) return data;
       // ONE retry on the lighter fallback model after 5s
       var fb = model === 'gemini-2.5-flash-lite' ? 'gemini-flash-lite-latest' : 'gemini-2.5-flash-lite';
-      return wait(5000).then(function() { return callModel(fb); });
+      return wait(5000).then(function() { return callModel(fb); }).then(function(data2) {
+        if ((isOverloaded(data2) || isRateLimited(data2)) && GROQ_API_KEY) return callGroq();
+        return data2;
+      });
     });
+  }).catch(function(err) {
+    // Network-level failure on Gemini → last resort Groq
+    if (GROQ_API_KEY) return callGroq();
+    throw err;
   });
 }
 
@@ -2858,6 +2904,7 @@ function ocrHandleUpload(event) {
       });
     })
     .then(function(data) {
+      window._lastOcrProvider = data._provider || 'gemini';
       if (data.error) {
         if (data.error.code === 503 || /high demand|overloaded|unavailable/i.test(data.error.message || '')) {
           throw new Error('Gemini er overbelastet lige nu (prøvede 3 gange). Vent et minut og prøv igen.');
@@ -2965,6 +3012,11 @@ function ocrRenderReview() {
   }
 
   var html = '';
+
+  // Provider hint when Groq fallback was used
+  if (window._lastOcrProvider === 'groq' && ocrEditIndex === null) {
+    html += '<div style="padding:8px 12px;background:rgba(201,176,113,0.08);border:1px solid rgba(201,176,113,0.25);margin-bottom:12px;font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">⚡ Læst med Groq (Gemini-kvota opbrugt) — dobbelttjek tallene ekstra grundigt</div>';
+  }
 
   // Dashed holes info
   if (ep.hasDashedHoles) {
@@ -3503,6 +3555,8 @@ function switchAdminTab(tab) {
     document.getElementById('adminHandicapContent').classList.remove('hidden');
     var keyInput = document.getElementById('geminiKeyInput');
     if (keyInput && GEMINI_API_KEY) keyInput.value = GEMINI_API_KEY;
+    var groqInput = document.getElementById('groqKeyInput');
+    if (groqInput && GROQ_API_KEY) groqInput.value = GROQ_API_KEY;
   } else if (tab === 'data') {
     document.getElementById('adminTabData').style.borderBottomColor = '#C9B071';
     document.getElementById('adminDataContent').classList.remove('hidden');
@@ -3708,6 +3762,16 @@ function saveApprovedHandicap() {
       document.getElementById('handicapProposals').innerHTML +=
         '<div style="color:#ef4444;padding:8px;">Fejl: ' + err.message + '</div>';
     });
+}
+
+function saveGroqKey() {
+  var key = document.getElementById('groqKeyInput').value.trim();
+  var status = document.getElementById('groqKeyStatus');
+  if (!key) { status.textContent = 'Indtast en nøgle'; status.style.color = '#ef4444'; return; }
+  localStorage.setItem('groqKey', key);
+  GROQ_API_KEY = key;
+  status.textContent = '✓ Gemt';
+  status.style.color = '#4ade80';
 }
 
 function saveGeminiKey() {

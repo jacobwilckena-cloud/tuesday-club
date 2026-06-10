@@ -1816,8 +1816,18 @@ function renderMembers() {
       '<div style="font-family:Inter; font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:#C9B071; margin-bottom:6px;">Wins</div>' +
       '<div style="font-size:24px; color:#C9B071;">' + stats.wins + '</div>' +
       '</div>' +
-      '</div>' +
       '</div>';
+
+    // Sæsonanalyse (AI) — kun for spillere med runder
+    if (stats.rounds > 0) {
+      html += '<div style="margin-top:16px;display:flex;align-items:center;gap:12px;">' +
+        '<button onclick="generatePlayerSummary(' + player.id + ')" style="font-family:Inter,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px;padding:10px 16px;background:transparent;border:1px solid rgba(201,176,113,0.3);color:#C9B071;cursor:pointer;">✨ Generer sæsonanalyse</button>' +
+        '<div id="ai-loading-' + player.id + '" style="display:none;font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">⏳ Genererer...</div>' +
+        '</div>' +
+        '<div id="ai-summary-' + player.id + '" style="margin-top:14px;font-family:\'Crimson Text\',serif;font-style:italic;font-size:16px;color:#EFE7D2;line-height:1.7;display:none;border-left:2px solid rgba(201,176,113,0.4);padding:4px 0 4px 14px;white-space:normal;word-wrap:break-word;"></div>';
+    }
+
+    html += '</div>';
   }
   
   html += '</div>';
@@ -2066,63 +2076,7 @@ function renderStatistics() {
   });
   html += '</div>';
 
-  // ===== 7. SPILLEROVERSIGT =====
-  html += '<div class="round-card" style="margin-bottom:24px;">';
-  html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:20px;">👤 Spilleroversigt</h3>';
-  
-  players.forEach(function(p) {
-    var stats = getPlayerStats(p.id);
-    var stats9 = getPlayerStats(p.id, '9h');
-    var stats18 = getPlayerStats(p.id, '18h');
-    if (stats.rounds === 0) return;
-    
-    var prounds = rounds.filter(function(r) {
-      return r.participants && r.participants.includes(p.id) && r.scores && r.scores[p.id];
-    }).sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
-    
-    var recentScores = prounds.slice(0,5).map(function(r){ return r.scores[p.id].stableford; });
-    var trend = recentScores.length >= 2 ? recentScores[0] - recentScores[recentScores.length-1] : 0;
-    var trendTxt = trend > 2 ? '↑ I fremgang' : trend < -2 ? '↓ Nedgang' : '→ Stabil';
-    var trendCol = trend > 2 ? '#4ade80' : trend < -2 ? '#ef8c34' : '#B8AE95';
-
-    html += '<div style="border:1px solid rgba(201,176,113,0.12);padding:16px;margin-bottom:12px;">';
-    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">';
-    if (p.photo_url) {
-      html += '<img src="'+p.photo_url+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid rgba(201,176,113,0.3);">';
-    } else {
-      html += '<div style="width:48px;height:48px;border-radius:50%;background:rgba(201,176,113,0.1);display:flex;align-items:center;justify-content:center;font-family:\'Crimson Text\',serif;font-size:20px;color:#C9B071;border:2px solid rgba(201,176,113,0.2);">'+p.name.charAt(0)+'</div>';
-    }
-    html += '<div style="flex:1;">';
-    html += '<div style="font-family:\'Crimson Text\',serif;font-size:18px;color:#EFE7D2;">'+p.name+'</div>';
-    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">HCP '+p.handicap.toFixed(1)+' · '+p.club+'</div>';
-    html += '</div>';
-    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:'+trendCol+';">'+trendTxt+'</div>';
-    html += '</div>';
-    
-    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-family:Inter,sans-serif;">';
-    function mini(label, val) {
-      return '<div style="text-align:center;background:rgba(201,176,113,0.04);padding:8px 4px;">' +
-        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#B8AE95;margin-bottom:4px;">'+label+'</div>' +
-        '<div style="font-family:\'Crimson Text\',serif;font-size:18px;color:#C9B071;font-weight:600;">'+val+'</div></div>';
-    }
-    html += mini('Runder', stats.rounds);
-    html += mini('Snit 9h', stats9.rounds > 0 ? stats9.qualifyingAvg : '—');
-    html += mini('Snit 18h', stats18.rounds > 0 ? stats18.qualifyingAvg : '—');
-    html += mini('Birdies', stats.totalBirdies);
-    html += mini('Bedste', stats.bestRound || '—');
-    html += mini('Wins', stats.wins);
-    html += '</div>';
-
-    html += '<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;">';
-    html += '<button onclick="generatePlayerSummary('+p.id+')" style="font-family:Inter,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px;padding:8px 14px;background:transparent;border:1px solid rgba(201,176,113,0.3);color:#C9B071;cursor:pointer;">✨ Generer sæsonanalyse</button>';
-    html += '<div id="ai-loading-'+p.id+'" style="display:none;font-size:11px;color:#B8AE95;">Genererer...</div>';
-    html += '</div>';
-    html += '<div id="ai-summary-'+p.id+'" style="margin-top:12px;font-family:\'Crimson Text\',serif;font-style:italic;font-size:15px;color:#EFE7D2;line-height:1.6;display:none;border-left:2px solid rgba(201,176,113,0.3);padding-left:12px;"></div>';
-    html += '</div>';
-  });
-  html += '</div>';
-
-  // ===== 8. HANDICAP UDVIKLING GRAF =====
+    // ===== 8. HANDICAP UDVIKLING GRAF =====
   var playersWithHistory = players.filter(function(p) {
     return p.handicap_history && p.handicap_history.length >= 1;
   });
@@ -3688,7 +3642,7 @@ function generatePlayerSummary(playerId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: summaryPrompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 400 }
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } }
     })
   })
   .then(function(r){ return r.json(); })

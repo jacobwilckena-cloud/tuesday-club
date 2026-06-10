@@ -801,19 +801,15 @@ body {
 
       <!-- STEP: review — validate one card -->
       <div id="ocrStep_review" class="hidden" style="border: 1px solid rgba(201,176,113,0.3); padding: 20px; margin-bottom: 24px; background: rgba(201,176,113,0.05);">
-        <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 4px;">BEKRÆFT SCORECARD</div>
+        <div id="ocrReviewHeader" style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 4px;">BEKRÆFT SCORECARD</div>
         <div id="ocrReviewBody"></div>
-        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
-          <button type="button" onclick="ocrApproveCard()" class="btn-primary" style="flex:1;">✓ Godkend</button>
-          <label for="ocrNextCardInput" class="btn-secondary" style="flex:1;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;">📸 Næste scorecard</label>
-          <input type="file" id="ocrNextCardInput" accept="image/*" style="display:none" onchange="ocrHandleUpload(event)">
-        </div>
-        <button type="button" onclick="ocrCancelCard()" style="width:100%;margin-top:10px;padding:10px;background:none;border:1px solid rgba(201,176,113,0.2);color:#B8AE95;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;letter-spacing:1px;">ANNULLER DETTE SCORECARD</button>
+        <button type="button" onclick="ocrApproveCard()" class="btn-primary" style="width:100%;margin-top:16px;">✓ Godkend spiller</button>
+        <button type="button" onclick="ocrCancelCard()" style="width:100%;margin-top:10px;padding:10px;background:none;border:1px solid rgba(201,176,113,0.2);color:#B8AE95;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;letter-spacing:1px;">ANNULLER</button>
       </div>
 
       <!-- STEP: queue — show approved cards, add more or save all -->
       <div id="ocrStep_queue" class="hidden" style="border: 1px solid rgba(201,176,113,0.3); padding: 20px; margin-bottom: 24px; background: rgba(201,176,113,0.05);">
-        <div style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 12px;">KLAR TIL AT GEMME</div>
+        <div id="ocrQueueHeader" style="font-family: Inter, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #C9B071; margin-bottom: 12px;">KLAR TIL AT GEMME</div>
         <div id="ocrQueueList"></div>
         <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
           <label for="ocrAddCardInput" class="btn-secondary" style="flex:1;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;">📸 Tilføj scorecard</label>
@@ -2826,6 +2822,17 @@ function ocrRenderReview() {
   var card = ocrCurrentCard;
   if (!card) return;
   var ep = card.ep;
+
+  // Context-aware header
+  var header = document.getElementById('ocrReviewHeader');
+  if (header) {
+    if (ocrEditIndex !== null) {
+      header.textContent = '✏️ RET SPILLER';
+    } else {
+      header.textContent = 'BEKRÆFT SPILLER ' + (ocrQueue.length + 1);
+    }
+  }
+
   var html = '';
 
   // Player name match selector
@@ -2887,6 +2894,8 @@ function ocrRenderReview() {
   document.getElementById('ocrReviewBody').innerHTML = html;
 }
 
+var ocrEditIndex = null; // null = reviewing a new scan; number = editing queue[i]
+
 function ocrApproveCard() {
   var card = ocrCurrentCard;
   if (!card) return;
@@ -2898,22 +2907,40 @@ function ocrApproveCard() {
 
   if (!card.matchId) { ocrShowError('Vælg en spiller inden godkendelse'); return; }
 
-  // Check not already in queue
-  var existing = ocrQueue.findIndex(function(c) { return c.matchId === card.matchId; });
-  if (existing >= 0) ocrQueue[existing] = card; // overwrite if same player
-  else ocrQueue.push(card);
+  if (ocrEditIndex !== null) {
+    // Editing existing queue entry — update in place
+    ocrQueue[ocrEditIndex] = card;
+  } else {
+    // New card — overwrite if same player already queued, else append
+    var existing = ocrQueue.findIndex(function(c) { return c.matchId === card.matchId; });
+    if (existing >= 0) ocrQueue[existing] = card;
+    else ocrQueue.push(card);
+  }
 
   ocrCurrentCard = null;
+  ocrEditIndex = null;
   ocrRenderQueue();
   ocrShowStep('queue');
 }
 
+function ocrEditCard(idx) {
+  if (!ocrQueue[idx]) return;
+  // Deep-ish copy so cancel doesn't mutate the queue entry
+  var src = ocrQueue[idx];
+  ocrCurrentCard = { ep: src.ep, matchId: src.matchId, birdies: src.birdies };
+  ocrEditIndex = idx;
+  ocrRenderReview();
+  ocrShowStep('review');
+}
+
 function ocrCancelCard() {
   ocrCurrentCard = null;
+  ocrEditIndex = null;
   ocrShowStep(ocrQueue.length > 0 ? 'queue' : 'idle');
 }
 
-function ocrRemoveFromQueue(idx) {
+function ocrRemoveFromQueue(idx, ev) {
+  if (ev) ev.stopPropagation();
   ocrQueue.splice(idx, 1);
   ocrRenderQueue();
   if (ocrQueue.length === 0) ocrShowStep('idle');
@@ -2922,11 +2949,16 @@ function ocrRemoveFromQueue(idx) {
 function ocrRenderQueue() {
   var el = document.getElementById('ocrQueueList');
   if (!el) return;
+  var qh = document.getElementById('ocrQueueHeader');
+  if (qh) qh.textContent = ocrQueue.length + ' SPILLER' + (ocrQueue.length !== 1 ? 'E' : '') + ' KLAR TIL AT GEMME';
   var html = '';
+  if (ocrQueue.length > 0) {
+    html += '<div style="font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;font-style:italic;margin-bottom:8px;">Tryk på en spiller for at rette</div>';
+  }
   ocrQueue.forEach(function(card, idx) {
     var player = players.find(function(p) { return p.id === card.matchId; });
     var ep = card.ep;
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(201,176,113,0.15);">';
+    html += '<div onclick="ocrEditCard(' + idx + ')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 8px;border-bottom:1px solid rgba(201,176,113,0.15);cursor:pointer;border-radius:4px;" onmouseover="this.style.background=\'rgba(201,176,113,0.07)\'" onmouseout="this.style.background=\'none\'">';
     html += '<div>';
     html += '<div style="font-family:\'Crimson Text\',serif;font-size:17px;color:#EFE7D2;">' + (player ? player.name : ep.name) + '</div>';
     html += '<div style="font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;margin-top:2px;">' + ep.stableford + ' pts';
@@ -2950,7 +2982,7 @@ function ocrRenderQueue() {
       html += '</div>';
     }
     html += '</div>';
-    html += '<button type="button" onclick="ocrRemoveFromQueue(' + idx + ')" style="background:none;border:none;color:#ff6666;font-size:20px;cursor:pointer;padding:4px 8px;flex-shrink:0;">✕</button>';
+    html += '<button type="button" onclick="ocrRemoveFromQueue(' + idx + ', event)" style="background:none;border:none;color:#ff6666;font-size:20px;cursor:pointer;padding:4px 8px;flex-shrink:0;">✕</button>';
     html += '</div>';
   });
   el.innerHTML = html;

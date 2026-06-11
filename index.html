@@ -1282,13 +1282,13 @@ function normalizeScore(stablefordPoints, holes) {
 }
 
 // === SEPARAT SCORING FOR 9h OG 18h RUNDER ===
+var LEADERBOARD_MIN_ROUNDS = 3; // krav for at staa paa leaderboardet
+
 function getBestOfN(numRounds) {
-  if (numRounds === 1) return 1;
-  if (numRounds === 2) return 1;
-  if (numRounds === 3) return 3;
-  if (numRounds >= 4 && numRounds <= 5) return 5;
-  if (numRounds >= 6 && numRounds <= 7) return 7;
-  return 8; // 8+
+  // Procent-reglen: bedste 60% af runderne taeller (rundet op), max 8.
+  // 1->1, 2->2, 3->2, 4->3, 5->3, 6->4, 7->5, 8->5, 10->6, 13+->8
+  if (numRounds <= 0) return 0;
+  return Math.min(Math.ceil(numRounds * 0.6), 8);
 }
 
 // Format handicap for display: negative (plus-handicap) shows as "+2.2", normal as "13.7"
@@ -1423,8 +1423,12 @@ function getLeaderboardData() {
       };
     }).filter(function(s) { return s.rounds > 0; }); // Kun spillere med runder
     
-    // Sorter efter qualifyingAvg (højest først), så efter antal runder
+    // Markér kvalifikation (min. antal runder)
+    stats.forEach(function(s) { s.qualified = s.rounds >= LEADERBOARD_MIN_ROUNDS; });
+
+    // Sorter: kvalificerede oeverst, derefter qualifyingAvg, saa antal runder
     stats.sort(function(a, b) {
+      if (a.qualified !== b.qualified) return a.qualified ? -1 : 1;
       if (b.qualifyingAvg !== a.qualifyingAvg) return b.qualifyingAvg - a.qualifyingAvg;
       return b.rounds - a.rounds;
     });
@@ -1571,7 +1575,8 @@ function renderLeaderboard() {
     var stats = boardType === '18h' ? data.leaderboard18h : data.leaderboard9h;
     var boardHtml = '<div id="board-' + boardType + '" class="leaderboard-board" style="display: ' + (boardType === '9h' ? 'block' : 'none') + ';">';
     
-    var leader = stats.length > 0 ? stats[0] : null;
+    var qualifiedStats = stats.filter(function(s){ return s.qualified; });
+    var leader = qualifiedStats.length > 0 ? qualifiedStats[0] : null;
     
     if (leader && leader.rounds > 0) {
       boardHtml += '<div class="leader-hero">' +
@@ -1602,10 +1607,23 @@ function renderLeaderboard() {
       '<div class="text-right hide-mobile">Wins</div>' +
       '</div>';
     
+    var qualRank = 0;
+    var separatorShown = false;
     for (var i = 0; i < stats.length; i++) {
       var player = stats[i];
-      var rank = String(i + 1).padStart(2, '0');
-      var isTop3 = i < 3 ? 'top-3' : '';
+      var rank, isTop3;
+      if (player.qualified) {
+        qualRank++;
+        rank = String(qualRank).padStart(2, '0');
+        isTop3 = qualRank <= 3 ? 'top-3' : '';
+      } else {
+        if (!separatorShown) {
+          boardHtml += '<div style="padding:14px 16px 6px;font-family:Inter,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#B8AE95;border-top:1px solid rgba(201,176,113,0.15);margin-top:8px;">Ikke kvalificeret \u00b7 kr\u00e6ver ' + LEADERBOARD_MIN_ROUNDS + ' runder</div>';
+          separatorShown = true;
+        }
+        rank = '\u2014';
+        isTop3 = '';
+      }
       
       var photoHtml = '';
       if (player.photo_url) {
@@ -1614,7 +1632,7 @@ function renderLeaderboard() {
         photoHtml = '<div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(201,176,113,0.1); margin-right: 12px; display: flex; align-items: center; justify-content: center; font-family: \'Crimson Text\', serif; font-size: 16px; color: #C9B071; border: 2px solid rgba(201,176,113,0.3);">' + player.name.charAt(0) + '</div>';
       }
       
-      boardHtml += '<div class="standings-row ' + isTop3 + '" onclick="goToMemberCard(' + player.id + ')" style="cursor: pointer;">' +
+      boardHtml += '<div class="standings-row ' + isTop3 + '" onclick="goToMemberCard(' + player.id + ')" style="cursor: pointer;' + (player.qualified ? '' : 'opacity:0.45;') + '">' +
         '<div class="rank">' + rank + '</div>' +
         '<div style="display: flex; align-items: center;">' +
         photoHtml +

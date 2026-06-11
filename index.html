@@ -2312,87 +2312,56 @@ function renderStatistics() {
 }
 
 function renderHandicapGraph(graphPlayers) {
-  var W = 320, H = 160, PAD = { t:10, r:10, b:30, l:36 };
-  var innerW = W - PAD.l - PAD.r;
-  var innerH = H - PAD.t - PAD.b;
+  // Liste-layout: en raekke pr. spiller med udvikling — virker paa mobil
+  var items = graphPlayers.map(function(p) {
+    var hist = (p.handicap_history || []).filter(function(h){ return h.date && h.handicap != null; })
+      .sort(function(a,b){ return a.date.localeCompare(b.date); });
+    var pts = hist.map(function(h){ return h.handicap; });
+    // Nuvaerende altid med som sidste punkt
+    if (!pts.length || pts[pts.length-1] !== p.handicap) pts.push(p.handicap);
+    var start = pts[0], cur = pts[pts.length-1];
+    return { name: p.name, photo_url: p.photo_url, pts: pts, start: start, cur: cur, diff: cur - start };
+  }).sort(function(a,b){ return a.diff - b.diff; }); // stoerst forbedring oeverst
 
-  // Build data series per player
-  var series = graphPlayers.map(function(p) {
-    var pts = [];
-    if (p.handicap_history && p.handicap_history.length > 0) {
-      p.handicap_history.forEach(function(h) {
-        if (h.date && h.handicap != null) pts.push({ date: h.date, hcp: h.handicap });
-      });
-    }
-    // Always add current as latest point
-    var today = new Date().toISOString().split('T')[0];
-    if (!pts.length || pts[pts.length-1].hcp !== p.handicap) {
-      pts.push({ date: today, hcp: p.handicap });
-    }
-    pts.sort(function(a,b){ return a.date.localeCompare(b.date); });
-    return { name: p.name.split(' ')[0], color: p.id % 7 === 0 ? '#C9B071' : p.id % 7 === 1 ? '#4ade80' : p.id % 7 === 2 ? '#60a5fa' : p.id % 7 === 3 ? '#f472b6' : p.id % 7 === 4 ? '#fb923c' : p.id % 7 === 5 ? '#a78bfa' : '#34d399', pts: pts };
-  }).filter(function(s){ return s.pts.length > 0; });
+  if (!items.length) return '<div style="color:#B8AE95;font-style:italic;padding:16px;">Ingen data endnu.</div>';
 
-  if (!series.length) return '<div style="color:#B8AE95;font-style:italic;padding:16px;">Ingen data endnu — opdater handicap i admin for at se grafen.</div>';
-
-  // Get all dates and HCP values for scaling
-  var allDates = [], allHcp = [];
-  series.forEach(function(s){ s.pts.forEach(function(p){ allDates.push(p.date); allHcp.push(p.hcp); }); });
-  allDates.sort();
-  var minDate = allDates[0], maxDate = allDates[allDates.length-1];
-  var minHcp = Math.min.apply(null, allHcp) - 1;
-  var maxHcp = Math.max.apply(null, allHcp) + 1;
-
-  function xPos(date) {
-    if (minDate === maxDate) return PAD.l + innerW/2;
-    var t = (date.localeCompare(minDate)) / (maxDate.localeCompare(minDate));
-    return PAD.l + t * innerW;
-  }
-  function yPos(hcp) {
-    return PAD.t + (1 - (hcp - minHcp)/(maxHcp - minHcp)) * innerH;
+  function sparkline(pts) {
+    if (pts.length < 2) return '';
+    var w = 70, h = 24, pad = 3;
+    var mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts);
+    var range = (mx - mn) || 1;
+    var d = pts.map(function(v, i) {
+      var x = pad + (i/(pts.length-1)) * (w - 2*pad);
+      var y = pad + (1 - (v - mn)/range) * (h - 2*pad);
+      return (i===0?'M':'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ');
+    return '<svg viewBox="0 0 '+w+' '+h+'" style="width:'+w+'px;height:'+h+'px;flex-shrink:0;">' +
+      '<path d="'+d+'" fill="none" stroke="#C9B071" stroke-width="1.5" stroke-linecap="round"/></svg>';
   }
 
-  var svg = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;overflow:visible;">';
+  var html = '';
+  items.forEach(function(it) {
+    var photo = it.photo_url
+      ? '<img src="'+it.photo_url+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
+      : '<div style="width:32px;height:32px;border-radius:50%;background:rgba(201,176,113,0.1);display:flex;align-items:center;justify-content:center;font-family:\'Crimson Text\',serif;color:#C9B071;flex-shrink:0;">'+it.name.charAt(0)+'</div>';
+    var arrow, arrowCol, diffStr;
+    if (it.diff < -0.05) { arrow = '\u2193'; arrowCol = '#4ade80'; diffStr = it.diff.toFixed(1); }
+    else if (it.diff > 0.05) { arrow = '\u2191'; arrowCol = '#ef4444'; diffStr = '+' + it.diff.toFixed(1); }
+    else { arrow = '\u2192'; arrowCol = '#B8AE95'; diffStr = '\u00b10.0'; }
 
-  // Grid lines
-  for (var i = 0; i <= 4; i++) {
-    var y = PAD.t + (i/4)*innerH;
-    var hcpVal = (maxHcp - (i/4)*(maxHcp-minHcp)).toFixed(1);
-    svg += '<line x1="'+PAD.l+'" y1="'+y+'" x2="'+(W-PAD.r)+'" y2="'+y+'" stroke="rgba(201,176,113,0.1)" stroke-width="1"/>';
-    svg += '<text x="'+(PAD.l-4)+'" y="'+(y+4)+'" font-family="Inter,sans-serif" font-size="8" fill="#B8AE95" text-anchor="end">'+hcpVal+'</text>';
-  }
-
-  // Lines and dots per player
-  series.forEach(function(s) {
-    if (s.pts.length === 1) {
-      // Single point — draw dot only
-      var cx = xPos(s.pts[0].date), cy = yPos(s.pts[0].hcp);
-      svg += '<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="'+s.color+'"/>';
-    } else {
-      var pathD = s.pts.map(function(p, i) {
-        return (i===0?'M':'L') + xPos(p.date).toFixed(1) + ' ' + yPos(p.hcp).toFixed(1);
-      }).join(' ');
-      svg += '<path d="'+pathD+'" fill="none" stroke="'+s.color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
-      s.pts.forEach(function(p) {
-        svg += '<circle cx="'+xPos(p.date).toFixed(1)+'" cy="'+yPos(p.hcp).toFixed(1)+'" r="3" fill="'+s.color+'"/>';
-      });
-    }
-    // Label at last point
-    var last = s.pts[s.pts.length-1];
-    svg += '<text x="'+(xPos(last.date)+5)+'" y="'+(yPos(last.hcp)+4)+'" font-family="Inter,sans-serif" font-size="9" fill="'+s.color+'">'+s.name+'</text>';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(201,176,113,0.08);">';
+    html += photo;
+    html += '<div style="flex:1;min-width:0;">';
+    html += '<div style="font-family:\'Crimson Text\',serif;font-size:15px;color:#EFE7D2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+it.name+'</div>';
+    html += '<div style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">'+formatHcp(it.start)+' \u2192 '+formatHcp(it.cur)+'</div>';
+    html += '</div>';
+    html += sparkline(it.pts);
+    html += '<div style="flex-shrink:0;text-align:right;min-width:48px;">';
+    html += '<span style="font-family:\'Crimson Text\',serif;font-size:18px;color:'+arrowCol+';font-weight:600;">'+arrow+' '+diffStr+'</span>';
+    html += '</div>';
+    html += '</div>';
   });
-
-  svg += '</svg>';
-
-  // Legend
-  var legend = '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;">';
-  series.forEach(function(s) {
-    legend += '<div style="display:flex;align-items:center;gap:4px;font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;">';
-    legend += '<div style="width:12px;height:3px;background:'+s.color+';border-radius:2px;"></div>'+s.name+'</div>';
-  });
-  legend += '</div>';
-
-  return svg + legend;
+  return html;
 }
 
 function renderContent() {

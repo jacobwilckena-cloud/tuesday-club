@@ -4227,7 +4227,8 @@ function generateSummaryText(playerId) {
 
   if (!GEMINI_API_KEY) return callGroqText();
 
-  return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.5-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
+  return getGeminiModel().then(function(model) {
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -4248,6 +4249,7 @@ function generateSummaryText(playerId) {
   .catch(function(err) {
     if (GROQ_API_KEY) return callGroqText();
     throw err;
+  });
   });
 }
 
@@ -4278,13 +4280,18 @@ function regenerateAllSummaries() {
   var btn = document.getElementById('regenAllBtn');
   var status = document.getElementById('regenAllStatus');
   if (btn) btn.disabled = true;
-  var done = 0, failed = 0;
+  var done = 0, failed = 0, firstError = '';
+  function wait(ms) { return new Promise(function(res){ setTimeout(res, ms); }); }
   var chain = Promise.resolve();
-  ids.forEach(function(id) {
+  ids.forEach(function(id, idx) {
     chain = chain.then(function() {
-      if (status) status.textContent = '\u23f3 ' + (done + failed + 1) + ' af ' + ids.length + '...';
-      return refreshPlayerSummary(id).then(function(){ done++; }).catch(function(err) {
+      if (status) { status.textContent = '\u23f3 ' + (idx + 1) + ' af ' + ids.length + '...'; status.style.color = '#B8AE95'; }
+      // Throttle: 7s mellem kald saa vi ikke rammer Geminis rate-limit
+      return (idx > 0 ? wait(7000) : Promise.resolve()).then(function() {
+        return refreshPlayerSummary(id);
+      }).then(function(){ done++; }).catch(function(err) {
         failed++;
+        if (!firstError) firstError = err.message || String(err);
         console.warn('Analyse fejlede for spiller ' + id + ':', err.message);
       });
     });
@@ -4292,7 +4299,7 @@ function regenerateAllSummaries() {
   chain.then(function() {
     if (btn) btn.disabled = false;
     if (status) {
-      status.textContent = '\u2713 ' + done + ' opdateret' + (failed ? ', ' + failed + ' fejlede' : '');
+      status.textContent = '\u2713 ' + done + ' opdateret' + (failed ? ', ' + failed + ' fejlede' + (firstError ? ' \u2014 ' + firstError : '') : '');
       status.style.color = failed ? '#ef4444' : '#4ade80';
     }
   });

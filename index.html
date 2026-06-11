@@ -1900,13 +1900,23 @@ function renderMembers() {
       '</div>' +
       '</div>';
 
-    // Sæsonanalyse (AI) — kun for spillere med runder
+    // Sæsonanalyse (AI) — altid synlig; auto-genereres hvis mangler
     if (stats.rounds > 0) {
-      html += '<div style="margin-top:16px;display:flex;align-items:center;gap:12px;">' +
-        '<button onclick="generatePlayerSummary(' + player.id + ')" style="font-family:Inter,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px;padding:10px 16px;background:transparent;border:1px solid rgba(201,176,113,0.3);color:#C9B071;cursor:pointer;">✨ Generer sæsonanalyse</button>' +
-        '<div id="ai-loading-' + player.id + '" style="display:none;font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">⏳ Genererer...</div>' +
-        '</div>' +
-        '<div id="ai-summary-' + player.id + '" style="margin-top:14px;font-family:\'Crimson Text\',serif;font-style:italic;font-size:16px;color:#EFE7D2;line-height:1.7;display:none;border-left:2px solid rgba(201,176,113,0.4);padding:4px 0 4px 14px;white-space:normal;word-wrap:break-word;"></div>';
+      var hasSummary = !!player.ai_summary;
+      var safeSummary = hasSummary ? String(player.ai_summary).replace(/&/g,'&amp;').replace(/</g,'&lt;') : '';
+      html += '<div style="margin-top:16px;">' +
+        '<div style="font-family:Inter,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#C9B071;margin-bottom:8px;">\u2728 S\u00e6sonanalyse</div>' +
+        '<div id="ai-loading-' + player.id + '" style="display:' + (hasSummary ? 'none' : 'block') + ';font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">\u23f3 Genererer...</div>' +
+        '<div id="ai-summary-' + player.id + '" style="font-family:\'Crimson Text\',serif;font-style:italic;font-size:16px;color:#EFE7D2;line-height:1.7;display:' + (hasSummary ? 'block' : 'none') + ';border-left:2px solid rgba(201,176,113,0.4);padding:4px 0 4px 14px;white-space:normal;word-wrap:break-word;">' + safeSummary + '</div>' +
+        '</div>';
+      if (!hasSummary) {
+        (function(pid){
+          setTimeout(function(){ refreshPlayerSummary(pid).catch(function(){
+            var l = document.getElementById('ai-loading-' + pid);
+            if (l) l.textContent = 'Analyse ikke tilg\u00e6ngelig (tjek API-n\u00f8gler)';
+          }); }, 50);
+        })(player.id);
+      }
     }
 
     html += '</div>';
@@ -3306,6 +3316,7 @@ function ocrSaveAll() {
     .then(function() { return loadRounds(); })
     .then(function() {
       renderContent();
+      regenerateSummaries(participants); // baggrund: opdater s\u00e6sonanalyser
       ocrResetAll();
       window.pendingMultiplayerRound = null;
       var successDiv = document.getElementById('addRoundSuccess');
@@ -3500,6 +3511,7 @@ function handleAddRound(event) {
     })
     .then(function() {
       renderContent();
+      regenerateSummaries(roundData.participants); // baggrund: opdater s\u00e6sonanalyser
       setTimeout(closeAddRoundModal, 1800);
     })
     .catch(function(error) {
@@ -3961,83 +3973,138 @@ function saveGeminiKey() {
   status.style.color = '#4ade80';
 }
 
-function generatePlayerSummary(playerId) {
+// ── Auto-genereret sæsonanalyse ────────────────────────────────────────────
+function buildSummaryContext(playerId) {
   var player = players.find(function(p){ return p.id === playerId; });
-  if (!player) return;
+  if (!player) return null;
 
-  var loadingEl = document.getElementById('ai-loading-'+playerId);
-  var summaryEl = document.getElementById('ai-summary-'+playerId);
-  if (loadingEl) loadingEl.style.display = 'block';
-  if (summaryEl) summaryEl.style.display = 'none';
-
-  // Build context about the player and their position relative to others
   var stats = getPlayerStats(playerId);
   var stats9 = getPlayerStats(playerId, '9h');
   var stats18 = getPlayerStats(playerId, '18h');
-
-  // Leaderboard position 9h
   var lb9 = getLeaderboardData().leaderboard9h;
   var lb18 = getLeaderboardData().leaderboard18h;
   var pos9 = lb9.findIndex(function(p){ return p.id === playerId; }) + 1;
   var pos18 = lb18.findIndex(function(p){ return p.id === playerId; }) + 1;
 
-  // Recent rounds
   var prounds = rounds.filter(function(r) {
     return r.participants && r.participants.includes(playerId) && r.scores && r.scores[playerId];
   }).sort(function(a,b){ return new Date(b.date)-new Date(a.date); }).slice(0,5);
 
   var recentStr = prounds.map(function(r) {
     var sc = r.scores[playerId];
-    return r.date + ' ('+holesLabel(r.holes)+'): '+sc.stableford+' pts'+(sc.grossScore>0?', '+sc.grossScore+' slag':'');
+    return r.date + ' ('+holesLabel(r.holes)+'): '+sc.stableford+' pts'+(sc.grossScore>0?', '+sc.grossScore+' slag':'')+(sc.birdies?', '+sc.birdies+' birdie(s)':'');
   }).join('; ');
 
-  // Other players context
+  var latest = prounds[0];
+  var latestStr = latest ? (latest.date + ' (' + holesLabel(latest.holes) + '): ' + latest.scores[playerId].stableford + ' pts' + (latest.scores[playerId].grossScore > 0 ? ', ' + latest.scores[playerId].grossScore + ' slag' : '') + (latest.scores[playerId].birdies ? ', ' + latest.scores[playerId].birdies + ' birdie(s)' : '')) : '—';
+
   var othersStr = players.filter(function(p){ return p.id !== playerId && getPlayerStats(p.id).rounds > 0; })
     .map(function(p) {
       var ps = getPlayerStats(p.id);
       var lbPos9 = lb9.findIndex(function(x){ return x.id === p.id; }) + 1;
-      return p.name + ' (HCP '+formatHcp(p.handicap)+', snit '+ps.qualifyingAvg+', #'+lbPos9+' på 9h leaderboard)';
+      return p.name + ' (HCP '+formatHcp(p.handicap)+', snit '+ps.qualifyingAvg+', '+ps.rounds+' runder, '+ps.totalBirdies+' birdies, #'+lbPos9+' på 9h leaderboard)';
     }).join('; ');
 
-  var context = 'Spiller: '+player.name+'\n'+
+  return 'Spiller: '+player.name+'\n'+
     'HCP: '+formatHcp(player.handicap)+'\n'+
-    'Runder: '+stats.rounds+'\n'+
-    (pos9>0?'Leaderboard position 9h: #'+pos9+'\n':'')+
-    (pos18>0?'Leaderboard position 18h: #'+pos18+'\n':'')+
+    'Runder i sæsonen: '+stats.rounds+'\n'+
+    'SENESTE RUNDE: '+latestStr+'\n'+
+    (pos9>0?'Leaderboard position 9h: #'+pos9+' af '+lb9.length+'\n':'')+
+    (pos18>0?'Leaderboard position 18h: #'+pos18+' af '+lb18.length+'\n':'')+
     'Bedste snit 9h: '+(stats9.qualifyingAvg||'—')+'\n'+
     'Bedste snit 18h: '+(stats18.qualifyingAvg||'—')+'\n'+
-    'Birdies: '+stats.totalBirdies+'\n'+
+    'Birdies i alt: '+stats.totalBirdies+'\n'+
     'Bedste runde: '+(stats.bestRound||'—')+'\n'+
-    'Seneste runder: '+recentStr+'\n'+
-    'Andre spillere: '+othersStr;
+    'Seneste 5 runder: '+recentStr+'\n'+
+    'De andre spillere (til sammenligning): '+othersStr;
+}
 
-  var summaryPrompt = 'Du er en golf-kommentator for Tuesday Club hos Mølleåens Golfklub. Skriv en kort, personlig sæsonanalyse på dansk (3-5 sætninger) for spilleren baseret på data nedenfor. Inkludér placering på leaderboardet, form, og sammenlign med de andre spillere. Vær positiv men ærlig. Brug golfterminologi. Tredje person.\n\n' + context;
+// Genererer tekst: Gemini først, Groq som fallback ved kvote/fejl
+function generateSummaryText(playerId) {
+  var context = buildSummaryContext(playerId);
+  if (!context) return Promise.reject(new Error('Spiller ikke fundet'));
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.5-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
+  var prompt = 'Du er en golf-kommentator for Tuesday Club hos Mølleåens Golfklub. Skriv en kort, personlig sæsonanalyse på dansk (3-5 sætninger) for spilleren baseret på data nedenfor. Læg vægt på den seneste runde (god/dårlig udvikling), formen over sæsonen, og placeringen relativt til de andre spillere. Vær positiv men ærlig. Brug golfterminologi. Tredje person. Svar KUN med selve analysen — ingen overskrift eller indledning.\n\n' + context;
+
+  function callGroqText() {
+    if (!GROQ_API_KEY) return Promise.reject(new Error('Ingen Groq-nøgle'));
+    return fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 600
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(g) {
+      if (g.error) throw new Error('Groq: ' + (g.error.message || 'ukendt fejl'));
+      var t = (g.choices && g.choices[0] && g.choices[0].message && g.choices[0].message.content) || '';
+      if (!t) throw new Error('Groq: tomt svar');
+      return t.trim();
+    });
+  }
+
+  if (!GEMINI_API_KEY) return callGroqText();
+
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (_geminiModelCache || 'gemini-2.5-flash') + ':generateContent?key=' + GEMINI_API_KEY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: summaryPrompt }] }],
+      contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { temperature: 0.7, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } }
     })
   })
   .then(function(r){ return r.json(); })
   .then(function(data) {
-    if (data.error) throw new Error(data.error.message);
-    var summary = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
-    if (loadingEl) loadingEl.style.display = 'none';
-    if (summaryEl) {
-      summaryEl.textContent = summary || 'Ingen analyse tilgængelig.';
-      summaryEl.style.display = 'block';
+    if (data.error) {
+      if (GROQ_API_KEY) return callGroqText();
+      throw new Error(data.error.message);
     }
+    var t = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
+    if (!t && GROQ_API_KEY) return callGroqText();
+    return t.trim();
   })
   .catch(function(err) {
-    if (loadingEl) loadingEl.style.display = 'none';
-    if (summaryEl) {
-      summaryEl.textContent = 'Fejl: ' + err.message;
-      summaryEl.style.display = 'block';
-    }
+    if (GROQ_API_KEY) return callGroqText();
+    throw err;
   });
+}
+
+// Genererer + gemmer analyse for én spiller (Supabase players.ai_summary)
+function refreshPlayerSummary(playerId) {
+  return generateSummaryText(playerId).then(function(text) {
+    var player = players.find(function(p){ return p.id === playerId; });
+    if (player) player.ai_summary = text;
+    var el = document.getElementById('ai-summary-' + playerId);
+    if (el) { el.textContent = text; el.style.display = 'block'; }
+    var loading = document.getElementById('ai-loading-' + playerId);
+    if (loading) loading.style.display = 'none';
+    if (supabase) {
+      return supabase.from('players').update({ ai_summary: text }).eq('id', playerId)
+        .then(function(res) {
+          if (res.error) console.warn('Kunne ikke gemme analyse:', res.error.message);
+          return text;
+        });
+    }
+    return text;
+  });
+}
+
+// Regenererer analyser for flere spillere, én ad gangen (skåner kvoten)
+function regenerateSummaries(playerIds) {
+  var ids = (playerIds || []).filter(function(id){ return players.some(function(p){ return p.id === id; }); });
+  var chain = Promise.resolve();
+  ids.forEach(function(id) {
+    chain = chain.then(function() {
+      return refreshPlayerSummary(id).catch(function(err) {
+        console.warn('Analyse fejlede for spiller ' + id + ':', err.message);
+      });
+    });
+  });
+  return chain;
 }
 
 function exportData() {

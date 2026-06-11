@@ -2094,50 +2094,6 @@ function renderStatistics() {
     }
   }
 
-  // ===== 5. HEAD-TO-HEAD =====
-  var activePls = players.filter(function(p){ return getPlayerStats(p.id).rounds > 0; });
-  if (activePls.length >= 2) {
-    html += '<div class="round-card" style="margin-bottom:24px;">';
-    html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">⚔️ Head-to-Head</h3>';
-    html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Wins når begge spiller samme runde</p>';
-
-    for (var i = 0; i < activePls.length; i++) {
-      for (var j = i+1; j < activePls.length; j++) {
-        var p1 = activePls[i]; var p2 = activePls[j];
-        var p1wins = 0; var p2wins = 0; var ties = 0;
-        rounds.forEach(function(r) {
-          if (!r.participants || !r.scores) return;
-          if (r.participants.includes(p1.id) && r.participants.includes(p2.id)) {
-            var s1 = (r.scores[p1.id] || {}).stableford || 0;
-            var s2 = (r.scores[p2.id] || {}).stableford || 0;
-            if (s1 > s2) p1wins++;
-            else if (s2 > s1) p2wins++;
-            else ties++;
-          }
-        });
-        var total = p1wins + p2wins + ties;
-        if (total === 0) continue;
-        var p1pct = Math.round((p1wins/total)*100);
-        var p2pct = Math.round((p2wins/total)*100);
-
-        html += '<div style="margin-bottom:16px;">';
-        html += '<div style="display:flex;justify-content:space-between;font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:4px;">';
-        html += '<span>'+p1.name.split(' ')[0]+'</span><span>'+p2.name.split(' ')[0]+'</span></div>';
-        html += '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(201,176,113,0.1);">';
-        if (p1pct > 0) html += '<div style="width:'+p1pct+'%;background:#C9B071;"></div>';
-        if (ties > 0) html += '<div style="flex:0 0 auto;width:'+(Math.round((ties/total)*100))+'%;background:rgba(201,176,113,0.3);"></div>';
-        if (p2pct > 0) html += '<div style="width:'+p2pct+'%;background:rgba(201,176,113,0.5);margin-left:auto;"></div>';
-        html += '</div>';
-        html += '<div style="display:flex;justify-content:space-between;font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;margin-top:2px;">';
-        html += '<span>'+p1wins+'W ('+p1pct+'%)</span>';
-        if (ties) html += '<span>'+ties+' tie</span>';
-        html += '<span>'+p2wins+'W ('+p2pct+'%)</span></div>';
-        html += '</div>';
-      }
-    }
-    html += '</div>';
-  }
-
   // ===== 6. TOP 10 RUNDER =====
   html += '<div class="round-card">';
   html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:20px;">🏆 Top 10 Runder</h3>';
@@ -4420,6 +4376,22 @@ function handleEditPlayer(event) {
   
   console.log('Updating player ID:', playerId);
   
+  // Byg handicap-historik: gem gammelt + nyt punkt, så grafen viser udviklingen
+  var editPlayer = players.find(function(p){ return p.id === playerId; });
+  var hcpHistory = (editPlayer && editPlayer.handicap_history) ? editPlayer.handicap_history.slice() : [];
+  if (editPlayer && editPlayer.handicap !== handicap) {
+    var todayStr = new Date().toISOString().split('T')[0];
+    if (hcpHistory.length === 0) {
+      // Seed med gammelt handicap dateret ved spillerens foerste runde (eller i gaar)
+      var firstRound = rounds.filter(function(r){ return r.participants && r.participants.includes(playerId); })
+        .map(function(r){ return r.date; }).sort()[0];
+      var seedDate = firstRound && firstRound < todayStr ? firstRound
+        : new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      hcpHistory.push({ date: seedDate, handicap: editPlayer.handicap });
+    }
+    hcpHistory.push({ date: todayStr, handicap: handicap });
+  }
+
   supabase
     .from('players')
     .update({
@@ -4427,6 +4399,7 @@ function handleEditPlayer(event) {
       photo_url: document.getElementById('editPlayerPhoto').value || null,
       club: document.getElementById('editPlayerClub').value,
       handicap: handicap,
+      handicap_history: hcpHistory,
       joined: document.getElementById('editPlayerJoined').value
     })
     .eq('id', playerId)

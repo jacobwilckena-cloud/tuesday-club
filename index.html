@@ -1962,6 +1962,59 @@ function renderStatistics() {
   html += statCard('Birdies', totalBirdies, 'i alt');
   html += '</div></div>';
 
+  // ===== 1b. REKORDER & MILEPAELE =====
+  (function() {
+    var perRound = []; // {pid, name, date, holes, pts, birdies}
+    rounds.forEach(function(r) {
+      (r.participants || []).forEach(function(pid) {
+        var sc = r.scores && r.scores[pid];
+        var pl = players.find(function(p){ return p.id === pid; });
+        if (!sc || !pl) return;
+        perRound.push({ pid: pid, name: pl.name, date: r.date, holes: r.holes, pts: sc.stableford || 0, birdies: sc.birdies || 0 });
+      });
+    });
+    if (!perRound.length) return;
+
+    // Bedste runde
+    var best = perRound.slice().sort(function(a,b){ return b.pts - a.pts; })[0];
+    // Flest birdies i en runde
+    var mostB = perRound.slice().sort(function(a,b){ return b.birdies - a.birdies; })[0];
+    // Laengste stime med 18+ point (pr. spiller, kronologisk)
+    var bestStreak = { name: '', len: 0 };
+    players.forEach(function(p) {
+      var prs = perRound.filter(function(x){ return x.pid === p.id; })
+        .sort(function(a,b){ return a.date.localeCompare(b.date); });
+      var cur = 0, mx = 0;
+      prs.forEach(function(x) { cur = x.pts >= 18 ? cur + 1 : 0; if (cur > mx) mx = cur; });
+      if (mx > bestStreak.len) bestStreak = { name: p.name.split(' ')[0], len: mx };
+    });
+    // Stoerste forbedring mellem to runder i traek
+    var bestJump = { name: '', diff: -999, date: '' };
+    players.forEach(function(p) {
+      var prs = perRound.filter(function(x){ return x.pid === p.id; })
+        .sort(function(a,b){ return a.date.localeCompare(b.date); });
+      for (var i = 1; i < prs.length; i++) {
+        var d = prs[i].pts - prs[i-1].pts;
+        if (d > bestJump.diff) bestJump = { name: p.name.split(' ')[0], diff: d, date: prs[i].date };
+      }
+    });
+
+    html += '<div class="round-card" style="margin-bottom:24px;">';
+    html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:20px;">\ud83c\udfc5 Rekorder</h3>';
+    function recRow(emoji, label, holder, value) {
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(201,176,113,0.08);">' +
+        '<div style="font-size:20px;flex-shrink:0;">' + emoji + '</div>' +
+        '<div style="flex:1;"><div style="font-family:Inter,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#B8AE95;">' + label + '</div>' +
+        '<div style="font-family:\'Crimson Text\',serif;font-size:16px;color:#EFE7D2;">' + holder + '</div></div>' +
+        '<div style="font-family:\'Crimson Text\',serif;font-size:24px;color:#C9B071;font-weight:600;flex-shrink:0;">' + value + '</div></div>';
+    }
+    html += recRow('\ud83c\udfc6', 'Bedste runde', best.name + ' \u00b7 ' + best.date, best.pts + ' pts');
+    if (mostB.birdies > 0) html += recRow('\ud83d\udc26', 'Flest birdies i \u00e9n runde', mostB.name + ' \u00b7 ' + mostB.date, mostB.birdies);
+    if (bestStreak.len >= 2) html += recRow('\ud83d\udd25', 'Stime med 18+ point', bestStreak.name, bestStreak.len + ' i tr\u00e6k');
+    if (bestJump.diff > 0 && bestJump.name) html += recRow('\ud83d\ude80', 'St\u00f8rste forbedring', bestJump.name + ' \u00b7 ' + bestJump.date, '+' + bestJump.diff + ' pts');
+    html += '</div>';
+  })();
+
   // ===== 2. BIRDIE KINGS =====
   var birdieKings = players.map(function(p) {
     var s = getPlayerStats(p.id);
@@ -2042,7 +2095,7 @@ function renderStatistics() {
   }
   html += '</div>';
 
-  // ===== 4. HUL-STATISTIK (fra holeScores data) =====
+  // ===== 4. HUL-STATISTIK (fra holeScores data, med spillervaelger) =====
   var holeDataRounds = rounds.filter(function(r) {
     return r.participants && r.participants.some(function(pid) {
       return r.scores && r.scores[pid] && r.scores[pid].holeScores && r.scores[pid].holeScores.length > 0;
@@ -2050,14 +2103,16 @@ function renderStatistics() {
   });
 
   if (holeDataRounds.length > 0) {
-    // Aggregate per-hole stats
-    var holeStats = {}; // hole number → {totalDiff, count}
+    var selPid = window.statsHolePlayer || 'all';
+    var holeStats = {};
     holeDataRounds.forEach(function(r) {
       (r.participants || []).forEach(function(pid) {
+        if (selPid !== 'all' && pid !== parseInt(selPid)) return;
         var sc = r.scores && r.scores[pid];
         if (!sc || !sc.holeScores || !sc.holePars) return;
         var startHole = (r.holes === 'Bag9') ? 10 : 1;
         sc.holeScores.forEach(function(strokes, i) {
+          if (!strokes || strokes === 0) return;
           var holeNum = startHole + i;
           var par = sc.holePars[i];
           var diff = strokes - par;
@@ -2069,13 +2124,26 @@ function renderStatistics() {
       });
     });
 
+    // Spillere der har hul-data
+    var holePlayers = players.filter(function(p) {
+      return holeDataRounds.some(function(r) {
+        var sc = r.scores && r.scores[p.id];
+        return sc && sc.holeScores && sc.holeScores.length > 0;
+      });
+    });
+
+    html += '<div class="round-card" style="margin-bottom:24px;">';
+    html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">\ud83d\udd73\ufe0f Hulstatistik</h3>';
+    html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">Gennemsnit vs par</p>';
+    html += '<select onchange="window.statsHolePlayer=this.value;renderContent();" style="width:100%;background:#1a1713;color:#EFE7D2;border:1px solid rgba(201,176,113,0.3);padding:10px;font-size:14px;border-radius:4px;margin-bottom:16px;">';
+    html += '<option value="all"' + (selPid === 'all' ? ' selected' : '') + '>Alle spillere</option>';
+    holePlayers.forEach(function(p) {
+      html += '<option value="' + p.id + '"' + (String(selPid) === String(p.id) ? ' selected' : '') + '>' + p.name + '</option>';
+    });
+    html += '</select>';
+
     var holeNums = Object.keys(holeStats).map(Number).sort(function(a,b){return a-b;});
     if (holeNums.length > 0) {
-      html += '<div class="round-card" style="margin-bottom:24px;">';
-      html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">🕳️ Hulstatistik</h3>';
-      html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Gennemsnit vs par · Alle spillere</p>';
-      
-      // Grid der altid viser alle huller paa skaermen (9 kolonner pr. raekke)
       var cols = Math.min(holeNums.length, 9);
       html += '<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:4px;">';
       holeNums.forEach(function(h) {
@@ -2087,14 +2155,111 @@ function renderStatistics() {
         html += '<div style="font-family:Inter,sans-serif;font-size:9px;color:#B8AE95;margin-bottom:4px;">'+h+'</div>';
         html += '<div style="font-family:\'Crimson Text\',serif;font-size:13px;color:'+col+';font-weight:600;white-space:nowrap;">'+avgStr+'</div>';
         if (hs.birdies > 0) {
-          html += '<div style="font-size:9px;color:#C9B071;margin-top:2px;">🐦'+hs.birdies+'</div>';
+          html += '<div style="font-size:9px;color:#C9B071;margin-top:2px;">\ud83d\udc26'+hs.birdies+'</div>';
         }
         html += '</div>';
       });
       html += '</div>';
-      html += '</div>';
+      // Hint: bedste/vaerste hul for valgt spiller
+      if (selPid !== 'all' && holeNums.length >= 2) {
+        var sorted = holeNums.slice().sort(function(x,y){ return (holeStats[x].total/holeStats[x].count) - (holeStats[y].total/holeStats[y].count); });
+        var easiest = sorted[0], hardest = sorted[sorted.length-1];
+        html += '<div style="margin-top:14px;font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">\u2b50 St\u00e6rkest p\u00e5 hul ' + easiest + ' \u00b7 \u26a0\ufe0f Taber flest slag p\u00e5 hul ' + hardest + '</div>';
+      }
+    } else {
+      html += '<div style="color:#B8AE95;font-style:italic;">Ingen hul-data for denne spiller endnu.</div>';
     }
+    html += '</div>';
   }
+
+  // ===== 5. SAESONUDVIKLING (snit point pr. maaned, normaliseret til 9 huller) =====
+  (function() {
+    var byMonth = {};
+    rounds.forEach(function(r) {
+      if (!r.date) return;
+      var month = r.date.slice(0, 7); // YYYY-MM
+      (r.participants || []).forEach(function(pid) {
+        var sc = r.scores && r.scores[pid];
+        if (!sc) return;
+        var pts9 = (r.holes === '18') ? (sc.stableford || 0) / 2 : (sc.stableford || 0);
+        if (!byMonth[month]) byMonth[month] = { total: 0, count: 0 };
+        byMonth[month].total += pts9;
+        byMonth[month].count++;
+      });
+    });
+    var monthKeys = Object.keys(byMonth).sort();
+    if (monthKeys.length < 2) return;
+
+    var monthNames = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+    var data = monthKeys.map(function(m) {
+      return { label: monthNames[parseInt(m.slice(5,7),10)-1], avg: byMonth[m].total / byMonth[m].count, n: byMonth[m].count };
+    });
+
+    var W = 320, H = 150, PAD = { t:14, r:14, b:26, l:30 };
+    var innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
+    var vals = data.map(function(d){ return d.avg; });
+    var minV = Math.floor(Math.min.apply(null, vals)) - 1;
+    var maxV = Math.ceil(Math.max.apply(null, vals)) + 1;
+    function xP(i) { return PAD.l + (data.length === 1 ? innerW/2 : (i/(data.length-1)) * innerW); }
+    function yP(v) { return PAD.t + (1 - (v - minV)/(maxV - minV)) * innerH; }
+
+    var svg = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;overflow:visible;">';
+    for (var gi = 0; gi <= 3; gi++) {
+      var gy = PAD.t + (gi/3)*innerH;
+      var gv = (maxV - (gi/3)*(maxV-minV)).toFixed(0);
+      svg += '<line x1="'+PAD.l+'" y1="'+gy+'" x2="'+(W-PAD.r)+'" y2="'+gy+'" stroke="rgba(201,176,113,0.1)" stroke-width="1"/>';
+      svg += '<text x="'+(PAD.l-4)+'" y="'+(gy+3)+'" font-family="Inter,sans-serif" font-size="8" fill="#B8AE95" text-anchor="end">'+gv+'</text>';
+    }
+    var pathD = data.map(function(d, i) { return (i===0?'M':'L') + xP(i).toFixed(1) + ' ' + yP(d.avg).toFixed(1); }).join(' ');
+    svg += '<path d="'+pathD+'" fill="none" stroke="#C9B071" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+    data.forEach(function(d, i) {
+      svg += '<circle cx="'+xP(i).toFixed(1)+'" cy="'+yP(d.avg).toFixed(1)+'" r="3.5" fill="#C9B071"/>';
+      svg += '<text x="'+xP(i).toFixed(1)+'" y="'+(yP(d.avg)-8)+'" font-family="Inter,sans-serif" font-size="9" fill="#EFE7D2" text-anchor="middle">'+d.avg.toFixed(1)+'</text>';
+      svg += '<text x="'+xP(i).toFixed(1)+'" y="'+(H-8)+'" font-family="Inter,sans-serif" font-size="9" fill="#B8AE95" text-anchor="middle">'+d.label+'</text>';
+    });
+    svg += '</svg>';
+
+    var trend = data[data.length-1].avg - data[0].avg;
+    var trendStr = trend > 0.3 ? '\ud83d\udcc8 Gruppen er i fremgang' : trend < -0.3 ? '\ud83d\udcc9 Gruppen er i tilbagegang' : '\u2194\ufe0f Stabilt niveau';
+
+    html += '<div class="round-card" style="margin-bottom:24px;">';
+    html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">\ud83d\udcc8 S\u00e6sonudvikling</h3>';
+    html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Snit point pr. m\u00e5ned \u00b7 pr. 9 huller \u00b7 alle spillere</p>';
+    html += svg;
+    html += '<div style="margin-top:10px;font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;">' + trendStr + '</div>';
+    html += '</div>';
+  })();
+
+  // ===== 5b. DELTAGELSE =====
+  (function() {
+    var att = players.map(function(p) {
+      return { name: p.name, photo_url: p.photo_url, rounds: getPlayerStats(p.id).rounds };
+    }).filter(function(p){ return p.rounds > 0; })
+      .sort(function(a,b){ return b.rounds - a.rounds; });
+    if (!att.length) return;
+    var maxR = att[0].rounds;
+    var totalGrouped = getGroupedRounds().length;
+
+    html += '<div class="round-card" style="margin-bottom:24px;">';
+    html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">\ud83d\udcc5 Deltagelse</h3>';
+    html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Runder spillet \u00b7 ' + totalGrouped + ' spilledage i alt</p>';
+    att.forEach(function(p, i) {
+      var photo = p.photo_url
+        ? '<img src="'+p.photo_url+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
+        : '<div style="width:32px;height:32px;border-radius:50%;background:rgba(201,176,113,0.1);display:flex;align-items:center;justify-content:center;font-family:\'Crimson Text\',serif;color:#C9B071;flex-shrink:0;">'+p.name.charAt(0)+'</div>';
+      var barW = Math.round((p.rounds / maxR) * 100);
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">';
+      html += photo;
+      html += '<div style="flex:1;">';
+      html += '<div style="font-family:\'Crimson Text\',serif;font-size:14px;color:#EFE7D2;">'+p.name+'</div>';
+      html += '<div style="height:5px;background:rgba(201,176,113,0.1);border-radius:3px;margin-top:3px;">';
+      html += '<div style="height:5px;width:'+barW+'%;background:'+(i===0?'#C9B071':'rgba(201,176,113,0.5)')+';border-radius:3px;"></div></div>';
+      html += '</div>';
+      html += '<div style="font-family:\'Crimson Text\',serif;font-size:18px;color:#C9B071;font-weight:600;flex-shrink:0;width:24px;text-align:right;">'+p.rounds+'</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  })();
 
   // ===== 6. TOP 10 RUNDER =====
   html += '<div class="round-card">';

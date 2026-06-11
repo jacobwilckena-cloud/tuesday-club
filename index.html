@@ -2075,21 +2075,23 @@ function renderStatistics() {
       html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">🕳️ Hulstatistik</h3>';
       html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">Gennemsnit vs par · Alle spillere</p>';
       
-      html += '<div style="overflow-x:auto;"><div style="display:flex;gap:8px;min-width:max-content;">';
+      // Grid der altid viser alle huller paa skaermen (9 kolonner pr. raekke)
+      var cols = Math.min(holeNums.length, 9);
+      html += '<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:4px;">';
       holeNums.forEach(function(h) {
         var hs = holeStats[h];
         var avg = hs.total / hs.count;
         var avgStr = avg >= 0 ? '+'+avg.toFixed(1) : avg.toFixed(1);
         var col = avg <= -0.5 ? '#C9B071' : avg <= 0.5 ? '#4ade80' : avg <= 1.5 ? '#B8AE95' : '#ef8c34';
-        html += '<div style="text-align:center;min-width:36px;">';
+        html += '<div style="text-align:center;min-width:0;">';
         html += '<div style="font-family:Inter,sans-serif;font-size:9px;color:#B8AE95;margin-bottom:4px;">'+h+'</div>';
-        html += '<div style="font-family:\'Crimson Text\',serif;font-size:14px;color:'+col+';font-weight:600;">'+avgStr+'</div>';
+        html += '<div style="font-family:\'Crimson Text\',serif;font-size:13px;color:'+col+';font-weight:600;white-space:nowrap;">'+avgStr+'</div>';
         if (hs.birdies > 0) {
           html += '<div style="font-size:9px;color:#C9B071;margin-top:2px;">🐦'+hs.birdies+'</div>';
         }
         html += '</div>';
       });
-      html += '</div></div>';
+      html += '</div>';
       html += '</div>';
     }
   }

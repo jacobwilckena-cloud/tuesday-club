@@ -3883,7 +3883,7 @@ function handleHandicapUpload(event) {
 
   Promise.all(files.map(function(file) { return compressImage(file); }))
     .then(function(images) {
-      var hcpPrompt = 'This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name and HCP value. Convert comma decimals to dots (11,6 → 11.6).\n\nIMPORTANT — plus handicaps: a value shown as "+2.2" (plus handicap, better than scratch) MUST be returned as a NEGATIVE number: -2.2. A normal handicap like 13.7 stays positive.\n\nReturn ONLY this JSON:\n{"players":[{"name":"Oscar Wanstrup","handicap":13.7},{"name":"Alexander Bo Jensen","handicap":-2.2}]}';
+      var hcpPrompt = 'This is a GolfBox/DGU handicap list screenshot. Extract ALL rows showing player name, HCP value and club name. Convert comma decimals to dots (11,6 → 11.6).\n\nIMPORTANT — plus handicaps: a value shown as "+2.2" (plus handicap, better than scratch) MUST be returned as a NEGATIVE number: -2.2. A normal handicap like 13.7 stays positive.\n\nReturn ONLY this JSON:\n{"players":[{"name":"Oscar Wanstrup","handicap":13.7,"club":"M\u00f8lle\u00e5ens Golf Klub"},{"name":"Alexander Bo Jensen","handicap":-2.2,"club":"Maribo S\u00f8 Golfklub"}]}';
       // Sequential (not parallel) via geminiGenerate → throttle + Groq fallback respected
       var collected = [];
       var chain = Promise.resolve();
@@ -3917,25 +3917,87 @@ function handleHandicapUpload(event) {
         });
       });
 
-      // Match against our players
-      handicapProposals = [];
-      players.forEach(function(player) {
-        var ourFirst = player.name.trim().split(/\s+/)[0].toLowerCase();
-        var ourLast = player.name.trim().split(/\s+/).slice(-1)[0].toLowerCase();
-        
-        // Find best match by first+last name
-        var match = null;
-        Object.values(extracted).forEach(function(ep) {
-          var epParts = ep.name.toLowerCase().split(/\s+/);
-          var epFirst = epParts[0];
-          var epLast = epParts[epParts.length - 1];
-          if ((epFirst === ourFirst && epLast === ourLast) ||
-              (ep.name.toLowerCase().includes(ourFirst) && ep.name.toLowerCase().includes(ourLast))) {
-            match = ep;
-          }
-        });
+      // Match against our players — scoringsbaseret, tolerant over for mellemnavne og OCR-fejl
+      var eps = Object.values(extracted).filter(function(ep){ return ep.name && typeof ep.handicap === 'number'; });
+      var claimed = {}; // ep-navn -> true, saa to spillere ikke tager samme raekke
 
-        if (match && typeof match.handicap === 'number' && Math.abs(match.handicap - player.handicap) >= 0.05) {
+      function norm(s) { return String(s||'').toLowerCase().trim(); }
+      function tokens(s) { return norm(s).split(/[\s\-]+/).filter(Boolean); }
+      function editDist1(a, b) { // true hvis identiske eller 1 tegns forskel (OCR-tolerance)
+        if (a === b) return true;
+        if (Math.abs(a.length - b.length) > 1) return false;
+        var i=0, j=0, diff=0;
+        while (i < a.length && j < b.length) {
+          if (a[i] === b[j]) { i++; j++; continue; }
+          diff++;
+          if (diff > 1) return false;
+          if (a.length > b.length) i++;
+          else if (b.length > a.length) j++;
+          else { i++; j++; }
+        }
+        return diff + (a.length - i) + (b.length - j) <= 1;
+      }
+
+      function scoreMatch(player, ep) {
+        var pt = tokens(player.name);
+        var et = tokens(ep.name);
+        if (!pt.length || !et.length) return 0;
+        var score = 0;
+        // Fornavn
+        if (pt[0] === et[0]) score += 3;
+        else if (editDist1(pt[0], et[0])) score += 2;
+        // Efternavn (vores sidste token mod alle deres tokens)
+        var pLast = pt[pt.length - 1];
+        if (pt.length > 1) {
+          if (et.indexOf(pLast) >= 0) score += 3;
+          else if (et.some(function(t){ return editDist1(t, pLast); })) score += 2;
+        }
+        // Mellemnavne der matcher
+        pt.slice(1, -1).forEach(function(t) {
+          if (et.indexOf(t) >= 0) score += 1;
+        });
+        // Klub-bonus: M\u00f8lle\u00e5ens-medlemmer foretraekkes ved tvivl
+        if (ep.club && /m\u00f8lle/i.test(ep.club)) score += 0.5;
+        return score;
+      }
+
+      handicapProposals = [];
+      var matched = {}; // playerId -> ep
+
+      // Runde 1: bedste score-match (kraever fornavn + efternavn rimeligt sikre: score >= 5)
+      players.forEach(function(player) {
+        var best = null, bestScore = 0;
+        eps.forEach(function(ep) {
+          if (claimed[ep.name]) return;
+          var s = scoreMatch(player, ep);
+          if (s > bestScore) { bestScore = s; best = ep; }
+        });
+        if (best && bestScore >= 5) {
+          matched[player.id] = best;
+          claimed[best.name] = true;
+        }
+      });
+
+      // Runde 2: fornavns-fallback — kun hvis entydigt i BEGGE retninger
+      players.forEach(function(player) {
+        if (matched[player.id]) return;
+        var pFirst = tokens(player.name)[0];
+        if (!pFirst) return;
+        var candidates = eps.filter(function(ep) {
+          return !claimed[ep.name] && (tokens(ep.name)[0] === pFirst || editDist1(tokens(ep.name)[0], pFirst));
+        });
+        var sameFirstPlayers = players.filter(function(p) {
+          return !matched[p.id] && tokens(p.name)[0] === pFirst;
+        });
+        if (candidates.length === 1 && sameFirstPlayers.length === 1) {
+          matched[player.id] = candidates[0];
+          claimed[candidates[0].name] = true;
+        }
+      });
+
+      players.forEach(function(player) {
+        var match = matched[player.id];
+        if (match && Math.abs(match.handicap - player.handicap) >= 0.05) {
           handicapProposals.push({
             player: player,
             newHandicap: match.handicap,

@@ -986,6 +986,12 @@ body {
         <button onclick="saveGroqKey()" class="btn-secondary" style="font-size:12px;">Gem nøgle</button>
         <span id="groqKeyStatus" style="font-size:12px;margin-left:12px;"></span>
       </div>
+      <div style="margin-bottom:24px; padding:16px; background:rgba(201,176,113,0.05); border:1px solid rgba(201,176,113,0.15);">
+        <h3 style="font-size:16px;color:#EFE7D2;margin-bottom:8px;">✨ Sæsonanalyser</h3>
+        <p style="color:#B8AE95;font-size:12px;margin-bottom:12px;">Regenerér alle spilleres AI-analyser, fx efter regelændringer på leaderboardet. Kører én ad gangen.</p>
+        <button id="regenAllBtn" onclick="regenerateAllSummaries()" class="btn-secondary" style="font-size:12px;">🔄 Regenerér alle analyser</button>
+        <span id="regenAllStatus" style="font-size:12px;margin-left:12px;color:#B8AE95;"></span>
+      </div>
       <div style="margin-bottom: 24px;">
         <h3 style="font-size: 20px; color: #EFE7D2; margin-bottom: 8px;">📊 Opdater Handicap</h3>
         <p style="color: #B8AE95; font-size: 14px; margin-bottom: 16px;">Upload screenshot fra GolfBox/DGU handicapliste. Appen finder automatisk dine spillere og foreslår opdateringer.</p>
@@ -4262,6 +4268,33 @@ function refreshPlayerSummary(playerId) {
         });
     }
     return text;
+  });
+}
+
+// Regenerér ALLE analyser med fremdrift (admin-knap)
+function regenerateAllSummaries() {
+  var ids = players.filter(function(p){ return getPlayerStats(p.id).rounds > 0; }).map(function(p){ return p.id; });
+  if (!ids.length) return;
+  var btn = document.getElementById('regenAllBtn');
+  var status = document.getElementById('regenAllStatus');
+  if (btn) btn.disabled = true;
+  var done = 0, failed = 0;
+  var chain = Promise.resolve();
+  ids.forEach(function(id) {
+    chain = chain.then(function() {
+      if (status) status.textContent = '\u23f3 ' + (done + failed + 1) + ' af ' + ids.length + '...';
+      return refreshPlayerSummary(id).then(function(){ done++; }).catch(function(err) {
+        failed++;
+        console.warn('Analyse fejlede for spiller ' + id + ':', err.message);
+      });
+    });
+  });
+  chain.then(function() {
+    if (btn) btn.disabled = false;
+    if (status) {
+      status.textContent = '\u2713 ' + done + ' opdateret' + (failed ? ', ' + failed + ' fejlede' : '');
+      status.style.color = failed ? '#ef4444' : '#4ade80';
+    }
   });
 }
 

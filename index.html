@@ -2158,7 +2158,8 @@ function renderStatistics() {
 
     html += '<div class="round-card" style="margin-bottom:24px;">';
     html += '<h3 style="font-size:22px;color:#EFE7D2;margin-bottom:8px;">\ud83d\udd73\ufe0f Hulstatistik</h3>';
-    html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">Gennemsnit vs par</p>';
+    html += '<p style="font-family:Inter,sans-serif;font-size:11px;color:#B8AE95;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Slag over/under par \u00b7 gennemsnit pr. hul</p>';
+    html += '<p style="font-family:Inter,sans-serif;font-size:10px;color:#B8AE95;margin-bottom:12px;font-style:italic;text-transform:none;letter-spacing:0;">Slagspil \u2014 ikke Stableford. +1.0 = \u00e9t slag over par i snit. \ud83d\udc26 = antal birdies.</p>';
     html += '<select onchange="window.statsHolePlayer=this.value;renderContent();" style="width:100%;background:#1a1713;color:#EFE7D2;border:1px solid rgba(201,176,113,0.3);padding:10px;font-size:14px;border-radius:4px;margin-bottom:16px;">';
     html += '<option value="all"' + (selPid === 'all' ? ' selected' : '') + '>Alle spillere</option>';
     holePlayers.forEach(function(p) {
